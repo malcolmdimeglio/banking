@@ -247,28 +247,45 @@ def render_monthly_bar_by_cat(_df_list):
     return fig
 
 
+def render_monthly_bar_total(_df_list):
+    fig, ax = plt.subplots(1, 1, figsize=(30, 15))
+
+    bottomV = 0
+    for index, el in enumerate(_df_list):
+        bar = ax.bar(el.index.values,
+                     el['amount'],
+                     color=colours[index],
+                     label=el.name,
+                     bottom=bottomV,
+                     width=150 * (1 / el.shape[0]))
+        bottomV += _df_list[index]['amount']
+
+    autolabel(bar, ax, bottomV)
 
     # 45 deg angle for X labels
-    plt.setp(ax.get_xticklabels(), rotation=45)
+    plt.setp(ax.get_xticklabels(),
+             rotation=45,
+             ha="right")
 
-    # Add labels
+    # Add XY labels
     ax.set(xlabel="Date",
-           ylabel="Spending ($)",
-           title="{} spending".format(_df.name));
+           ylabel="Spending ($)")
+    ax.title.set_weight('extra bold')
+    ax.title.set_fontsize('x-large')
+    ax.title.set_text("Month by month spending")
 
     # Set the locator
     locator = mdates.MonthLocator()  # every month
     # Specify the format - %b gives us Jan, Feb...
     fmt = mdates.DateFormatter('%b %Y')
 
-    X = plt.gca().xaxis
-    X.set_major_locator(locator)
+    ax.xaxis.set_major_locator(locator)
     # Specify formatter
-    X.set_major_formatter(fmt)
+    ax.xaxis.set_major_formatter(fmt)
     ax.legend()
 
-    autolabel(bar1, ax)
-    plt.show()
+    plt.tight_layout(w_pad=2.3, h_pad=1.3)
+    return fig
 
 
 if __name__ == "__main__":
