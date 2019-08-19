@@ -295,6 +295,4 @@ if __name__ == "__main__":
     monthly_restaurant = extract_monthly_spending(data, RESTAURANT)
     monthly_coffee = extract_monthly_spending(data, COFFEE)
     monthly_bar = extract_monthly_spending(data, BAR)
-    monthly_fix = extract_monthly_spending(data, FIX)
-    monthly_misc = extract_monthly_spending(data,MISC)
-    render(monthly_groceries)
+    monthly_misc = extract_monthly_spending(data, MISC)
