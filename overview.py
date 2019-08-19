@@ -181,14 +181,72 @@ def compute_average(_df):
     return df_tmp.min(), df_tmp.max(), df_tmp.mean()
 
 
-def render(_df):
-    fig, ax = plt.subplots(figsize=(15, 5))
-    bar1 = ax.bar(_df.index.values,
-                  _df['amount'],
-                  color='blue', label='monthly', width=0.99)
+def render_monthly_bar_by_cat(_df_list):
+    # 3 columns display
+    col = 3
+    row = len(_df_list) / 3
+    if math.modf(row)[0] != 0.0:
+        row += 1
 
-    _, _, avg = compute_average(_df)
-    ax.axhline(y=int(avg.amount), c="red", linewidth=0.5, label='avg')
+    fig, ax = plt.subplots(int(row), int(col), figsize=(30, 15))
+    ax = ax.flatten()
+
+    i = 0
+    for el in _df_list:
+        bar = ax[i].bar(el.index.values,
+                        el['amount'],
+                        color=colours[i],
+                        label='monthly',
+                        width=150 * (1 / el.shape[0]))
+
+        # Plot the average monthly spending on the corresponding graph
+        _, _, avg = compute_average(el)
+        ax[i].axhline(y=int(avg.amount),
+                      color="red",
+                      linewidth=0.5,
+                      label='avg',
+                      linestyle='--')
+        ax[i].annotate('{}'.format(int(avg.amount)),
+                       xy=(monthly_coffee.index[0], int(avg.amount)),
+                       xytext=(-10, 1),  # 3 points vertical offset
+                       textcoords="offset points",
+                       ha='right',
+                       va='bottom',
+                       color='red')
+
+        # 45 deg angle for X labels
+        plt.setp(ax[i].get_xticklabels(),
+                 rotation=45,
+                 ha="right")
+
+        # Add XY labels
+        ax[i].set(xlabel="Date",
+                  ylabel="Spending ($)")
+        ax[i].title.set_weight('extra bold')
+        ax[i].title.set_fontsize('x-large')
+        ax[i].title.set_text("{} spending".format(el.name))
+
+        # Set the locator
+        locator = mdates.MonthLocator()  # every month
+        # Specify the format - %b gives us Jan, Feb...
+        fmt = mdates.DateFormatter('%b %Y')
+
+        ax[i].xaxis.set_major_locator(locator)
+        # Specify formatter
+        ax[i].xaxis.set_major_formatter(fmt)
+        ax[i].legend()
+
+        autolabel(bar, ax[i], el['amount'])
+        i += 1
+
+    # Remove unused plots
+    for j in range(i, len(ax)):
+        ax[j].set_axis_off()
+
+    plt.tight_layout(w_pad=2.3, h_pad=1.3)
+    return fig
+
+
 
     # 45 deg angle for X labels
     plt.setp(ax.get_xticklabels(), rotation=45)
