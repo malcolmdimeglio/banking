@@ -177,6 +177,7 @@ def compute_average(_df):
     df_tmp = df_tmp.drop(df_tmp[df_tmp.amount == df_tmp.amount.max()].index)
     df_tmp = df_tmp.drop(df_tmp[df_tmp.amount == df_tmp.amount.min()].index)
     df_tmp = df_tmp.drop(df_tmp[(df_tmp.index.month == today.month) & (df_tmp.index.year == today.year)].index)
+    df_tmp = df_tmp.drop(df_tmp[df_tmp.amount == 0].index)
 
     return df_tmp.min(), df_tmp.max(), df_tmp.mean()
 
