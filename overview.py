@@ -158,15 +158,15 @@ def extract_monthly_spending(_df, spending):
     return df_tmp
 
 
-def autolabel(rects, ax):
+def autolabel(rects, ax, height):
     """Attach a text label above each bar in *rects*, displaying its height."""
-    for rect in rects:
-        height = rect.get_height()
-        ax.annotate('{}'.format(int(height)),
-                    xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(0, 3),  # 3 points vertical offset
+    for index, rect in enumerate(rects):
+        ax.annotate('{}'.format(int(height[index])),
+                    xy=(rect.get_x() + rect.get_width() / 2, height[index]),
+                    xytext=(0, 1),  # 1 points vertical offset
                     textcoords="offset points",
-                    ha='center', va='bottom')
+                    ha='center',
+                    va='bottom')
 
 
 def compute_average(_df):
