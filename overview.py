@@ -3,8 +3,15 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
+import math
 from datetime import date
 import matplotlib.dates as mdates
+from matplotlib.backends.backend_pdf import PdfPages
+
+# To get rid of pandas' matplotlib "FutureWarning"
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
+
 
 csv_file = "/Users/Malcolm/Desktop/pcbanking.csv"
 header = "date,place,amount"
@@ -30,16 +37,15 @@ TRANSPORT = 'transport'
 RESTAURANT = 'restaurant'
 COFFEE = 'coffee'
 BAR = 'bar'
-FIX = 'fix'
 MISC = 'misc'
 
-ALL = Groceries + Transport + Restaurant + Coffee + Bar + Fixed
+colours = ['#5DADE2', '#F5B041', '#58D68D', '#EC7063', '#BB8FCE', '#808B96', '#F7DC6F']
+figures = []
 
-
-# prepend header to csv
+# prepend header to csv if needed
 with open(csv_file, 'r') as file:
-    data = file.readline()
-    if re.search(header, data):
+    data = file.readline()  # read the first line
+    if re.search(header, data):  # if header is present then do not modify the csv file
         do_modify = False
     else:
         do_modify = True
@@ -47,7 +53,7 @@ with open(csv_file, 'r') as file:
 with open(csv_file, 'r') as file:
     data = file.read()
 
-if do_modify:
+if do_modify:  # add header if needed
     with open(csv_file, 'w') as file:
         file.write(header + '\n' + data)
 
@@ -57,13 +63,13 @@ all_spending_df = pd.read_csv(filepath_or_buffer=csv_file, sep=',')
 # Remove all incomes
 all_spending_df = all_spending_df[all_spending_df.amount < 0]
 
-# Change spending into positive values and lower case the place column
+# Change spending into positive values, lower case the 'place' column and datetime format for the 'date' column
 all_spending_df['amount'] = all_spending_df['amount'].apply(lambda x: -x)
 all_spending_df['place'] = all_spending_df["place"].apply(lambda x: x.lower())
 all_spending_df['date'] = pd.to_datetime(all_spending_df['date'])
 
 
-# Extract the Misc spending (prob a nicer way to do that)
+# Check if a given row is part of the given category
 def is_row_in_category(my_row, my_list):
     for el in my_list:
         if re.search(el, my_row['place']):
@@ -71,6 +77,7 @@ def is_row_in_category(my_row, my_list):
     return False
 
 
+# Populate a given dataframe with a given row
 def populate(_df, row):
     _df = _df.append({'date': row['date'],
                       'place': row['place'],
@@ -79,7 +86,8 @@ def populate(_df, row):
     return _df
 
 
-def organise_data(my_dataframe):
+# Parse all spending and populate smaller dataframes by categories
+def organise_data_by_category(my_dataframe):
     df_groc = df_trans = df_rest = df_coffee = \
     df_bar = df_fixed = df_misc = pd.DataFrame(columns=['date', 'place', 'amount'])
 
@@ -104,10 +112,6 @@ def organise_data(my_dataframe):
             df_bar = populate(df_bar, row)
             continue
 
-        if is_row_in_category(row, Fixed):
-            df_fixed = populate(df_fixed, row)
-            continue
-
         # If none of the above then let's put it in misc spending
         df_misc = populate(df_misc, row)
 
@@ -117,13 +121,13 @@ def organise_data(my_dataframe):
         RESTAURANT: df_rest,
         COFFEE: df_coffee,
         BAR: df_bar,
-        FIX: df_fixed,
         MISC: df_misc
     }
 
     return all_df
 
 
+# Create a small dataframe where each month is associated with a total of spending
 def extract_monthly_spending(_df, spending):
     df_tmp = pd.DataFrame(columns=['date', 'amount'])
 
@@ -144,10 +148,10 @@ def extract_monthly_spending(_df, spending):
         else:
             end_month = 12
 
-        # sum all spendings from a whole month, each month of the year
+        # sum all spending from a whole month, each month of the year
         for month in range(start_month, end_month + 1):
             df_tmp = df_tmp.append({"date": "{}-{}".format(month, year),
-                                    "amount": _df[spending].loc[(_df[spending].date.dt.month == month) & \
+                                    "amount": _df[spending].loc[(_df[spending].date.dt.month == month) &
                                                                 (_df[spending].date.dt.year == year), 'amount'].sum()},
                                    ignore_index=True)
 
@@ -171,9 +175,9 @@ def autolabel(rects, ax, height):
 
 def compute_average(_df):
     today = date.today()
-    df_tmp = pd.DataFrame(columns=['date', 'amount'])
     df_tmp = _df
 
+    # To calculate the average, let's get rid of the extremums, the current month and all 0$ spending months
     df_tmp = df_tmp.drop(df_tmp[df_tmp.amount == df_tmp.amount.max()].index)
     df_tmp = df_tmp.drop(df_tmp[df_tmp.amount == df_tmp.amount.min()].index)
     df_tmp = df_tmp.drop(df_tmp[(df_tmp.index.month == today.month) & (df_tmp.index.year == today.year)].index)
@@ -290,7 +294,7 @@ def render_monthly_bar_total(_df_list):
 
 
 if __name__ == "__main__":
-    data = organise_data(all_spending_df)
+    data = organise_data_by_category(all_spending_df)
     monthly_groceries = extract_monthly_spending(data, GROCERIES)
     monthly_transport = extract_monthly_spending(data, TRANSPORT)
     monthly_restaurant = extract_monthly_spending(data, RESTAURANT)
@@ -308,3 +312,4 @@ if __name__ == "__main__":
     for figure in figures:
         figure.savefig(doc, format='pdf')
     doc.close()
+
