@@ -296,3 +296,14 @@ if __name__ == "__main__":
     monthly_coffee = extract_monthly_spending(data, COFFEE)
     monthly_bar = extract_monthly_spending(data, BAR)
     monthly_misc = extract_monthly_spending(data, MISC)
+
+    monthly_spending = [monthly_groceries, monthly_transport, monthly_restaurant,
+                        monthly_coffee, monthly_bar, monthly_misc]
+
+    figures.append(render_monthly_bar_by_cat(monthly_spending))
+    figures.append(render_monthly_bar_total(monthly_spending))
+
+    doc = PdfPages("/Users/Malcolm/Desktop/mytest.pdf")
+    for figure in figures:
+        figure.savefig(doc, format='pdf')
+    doc.close()
