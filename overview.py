@@ -9,8 +9,8 @@ import matplotlib.dates as mdates
 csv_file = "/Users/Malcolm/Desktop/pcbanking.csv"
 header = "date,place,amount"
 
-Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia foods"]
-Transport = ["car2go", "evo", "avis", "rentals", "petrocan", "husky", "esso[^a-z]", "super save", "cab",
+Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia foods", "whole foods"]
+Transport = ["car2go", "evo", "avis", "rentals", "petrocan", "husky", "[^a-z]esso", "super save", "cab[^a-rt-z]",
              "compass", "taxi", "shell"]
 Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
               "moxie's", "burger", "la belle patate", "pho", "pizza", "bestie",
@@ -18,12 +18,12 @@ Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
               "kaori izakaya", "taco", "mexican", "zipang provisions", "mr. steak", "poke", "sushi", "earls"
               "mcdonald's", "diner", "subway sandwiches", "falafel", "donair", "fish", "pizz", "poutine",
               "white spot", "vij's", "the capital", "cactus club", "cantina", "fork", "denny's", "mumbai local"
-              "freshii", "captain's boil", "korean"]
+              "freshii", "captain's boil", "korean", "salade de fruits", "a & w"]
 Coffee = ["cafe", "coffee", "tim hortons", "starbucks", "bean", "birds & the beets", "the mighty oak",
-          "le marche st george", "caffe", "coco and olive", "buro", "blenz", "green horn", "bakery", "a & w"]
+          "le marche st george", "caffe", "coco and olive", "buro", "blenz", "green horn", "bakery"]
 Bar = ["brew", "beer", "pub[^a-z]", "steamworks", "distillery", "bar[^a-z]", "narrow lounge", "rumpus room",
-       "five point", "score on davie", "tap & barrel", "the cambie", "colony", "alibi room"]
-Fixed = ["ymca", "shaw", "fido", "soundcloud", "per se social corner", "grapes & soda"]
+       "five point", "score on davie", "tap & barrel", "the cambie", "colony", "alibi room", "local ",
+       "per se social corner", "grapes & soda"]
 
 GROCERIES = 'groceries'
 TRANSPORT = 'transport'
