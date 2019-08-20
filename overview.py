@@ -89,7 +89,7 @@ def populate(_df, row):
 # Parse all spending and populate smaller dataframes by categories
 def organise_data_by_category(my_dataframe):
     df_groc = df_trans = df_rest = df_coffee = \
-        df_bar = df_misc = pd.DataFrame(columns=['date', 'place', 'amount'])
+    df_bar = df_fixed = df_misc = pd.DataFrame(columns=['date', 'place', 'amount'])
 
     for index, row in my_dataframe.iterrows():
         if is_row_in_category(row, Groceries):
@@ -129,7 +129,7 @@ def organise_data_by_category(my_dataframe):
 
 # Create a small dataframe where each month is associated with a total of spending
 def extract_monthly_spending(_df, spending):
-    df_temp = pd.DataFrame(columns=['date', 'amount'])
+    df_tmp = pd.DataFrame(columns=['date', 'amount'])
 
     max_year = all_spending_df['date'].max().year
     min_year = all_spending_df['date'].min().year
@@ -150,16 +150,16 @@ def extract_monthly_spending(_df, spending):
 
         # sum all spending from a whole month, each month of the year
         for month in range(start_month, end_month + 1):
-            df_temp = df_temp.append({"date": "{}-{}".format(month, year),
-                                     "amount": _df[spending].loc[(_df[spending].date.dt.month == month) &
-                                                                 (_df[spending].date.dt.year == year), 'amount'].sum()},
-                                     ignore_index=True)
+            df_tmp = df_tmp.append({"date": "{}-{}".format(month, year),
+                                    "amount": _df[spending].loc[(_df[spending].date.dt.month == month) &
+                                                                (_df[spending].date.dt.year == year), 'amount'].sum()},
+                                   ignore_index=True)
 
-    df_temp['date'] = pd.to_datetime(df_temp['date'])
-    df_temp.set_index('date', inplace=True)
-    df_temp.name = spending
+    df_tmp['date'] = pd.to_datetime(df_tmp['date'])
+    df_tmp.set_index('date', inplace=True)
+    df_tmp.name = spending
 
-    return df_temp
+    return df_tmp
 
 
 def autolabel(rects, ax, height):
@@ -175,14 +175,15 @@ def autolabel(rects, ax, height):
 
 def compute_average(_df):
     today = date.today()
+    df_tmp = _df
 
     # To calculate the average, let's get rid of the extremums, the current month and all 0$ spending months
-    _df = _df.drop(_df[_df.amount == _df.amount.max()].index)
-    _df = _df.drop(_df[_df.amount == _df.amount.min()].index)
-    _df = _df.drop(_df[(_df.index.month == today.month) & (_df.index.year == today.year)].index)
-    _df = _df.drop(_df[_df.amount == 0].index)
+    df_tmp = df_tmp.drop(df_tmp[df_tmp.amount == df_tmp.amount.max()].index)
+    df_tmp = df_tmp.drop(df_tmp[df_tmp.amount == df_tmp.amount.min()].index)
+    df_tmp = df_tmp.drop(df_tmp[(df_tmp.index.month == today.month) & (df_tmp.index.year == today.year)].index)
+    df_tmp = df_tmp.drop(df_tmp[df_tmp.amount == 0].index)
 
-    return _df.min(), _df.max(), _df.mean()
+    return df_tmp.min(), df_tmp.max(), df_tmp.mean()
 
 
 def render_monthly_bar_by_cat(_df_list):
@@ -223,12 +224,12 @@ def render_monthly_bar_by_cat(_df_list):
                  rotation=45,
                  ha="right")
 
-        # Add XY labels and title
+        # Add XY labels
+        ax[i].set(xlabel="Date",
+                  ylabel="Spending ($)")
         ax[i].title.set_weight('extra bold')
-        ax[i].title.set_fontsize('xx-large')
-        ax[i].title.set_text("{}".format(el.name).title())
-        ax[i].set_ylabel('Spending ($)', fontsize='xx-large')
-        ax[i].set_xlabel('Date', fontsize='xx-large')
+        ax[i].title.set_fontsize('x-large')
+        ax[i].title.set_text("{} spending".format(el.name))
 
         # Set the locator
         locator = mdates.MonthLocator()  # every month
@@ -254,29 +255,29 @@ def render_monthly_bar_by_cat(_df_list):
 def render_monthly_bar_total(_df_list):
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
 
-    bottom_value = 0
+    bottomV = 0
     for index, el in enumerate(_df_list):
         bar = ax.bar(el.index.values,
                      el['amount'],
                      color=colours[index],
                      label=el.name,
-                     bottom=bottom_value,
+                     bottom=bottomV,
                      width=150 * (1 / el.shape[0]))
-        bottom_value += _df_list[index]['amount']
+        bottomV += _df_list[index]['amount']
 
-    autolabel(bar, ax, bottom_value)
+    autolabel(bar, ax, bottomV)
 
     # 45 deg angle for X labels
     plt.setp(ax.get_xticklabels(),
              rotation=45,
              ha="right")
 
-    # Add XY labels and title
+    # Add XY labels
+    ax.set(xlabel="Date",
+           ylabel="Spending ($)")
     ax.title.set_weight('extra bold')
-    ax.title.set_fontsize('xx-large')
+    ax.title.set_fontsize('x-large')
     ax.title.set_text("Month by month spending")
-    ax.set_ylabel('Spending ($)', fontsize='xx-large')
-    ax.set_xlabel('Date', fontsize='xx-large')
 
     # Set the locator
     locator = mdates.MonthLocator()  # every month
@@ -288,10 +289,7 @@ def render_monthly_bar_total(_df_list):
     ax.xaxis.set_major_formatter(fmt)
     ax.legend()
 
-    plt.tight_layout(w_pad=200, h_pad=500)
-    return fig
-
-
+    plt.tight_layout(w_pad=2.3, h_pad=1.3)
     return fig
 
 
@@ -314,3 +312,4 @@ if __name__ == "__main__":
     for figure in figures:
         figure.savefig(doc, format='pdf')
     doc.close()
+
