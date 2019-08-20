@@ -290,6 +290,25 @@ def render_monthly_bar_total(_df_list):
     ax.legend()
 
     plt.tight_layout(w_pad=2.3, h_pad=1.3)
+def render_average_pie(_df):
+    fig, ax = plt.subplots(1, 1, figsize=(30, 15))
+    explodes = [0.0] * len(_df)
+    explodes[0] = 0.2
+    _, _, autotexts = ax.pie(_df['amount'], labels=_df['name'],
+                             explode=explodes,
+                             autopct='%1.1f%%',
+                             shadow=False,
+                             frame=False,
+                             startangle=90,
+                             textprops={'fontsize': 'xx-large'},
+                             wedgeprops={'linewidth': 1, 'edgecolor': "black"})
+    ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+    plt.setp(autotexts, size=15, weight="bold")
+
+    ax.set_title("Proportion in spending")
+    ax.title.set_weight('extra bold')
+    ax.title.set_fontsize('xx-large')
+
     return fig
 
 
@@ -307,6 +326,14 @@ if __name__ == "__main__":
 
     figures.append(render_monthly_bar_by_cat(monthly_spending))
     figures.append(render_monthly_bar_total(monthly_spending))
+
+    avg_df = df_tmp = pd.DataFrame(columns=['name', 'amount'])
+
+    for cat in monthly_spending:
+        _, _, average = compute_average(cat)
+        avg_df = avg_df.append({'name': cat.name, 'amount': average}, ignore_index=True)
+
+    figures.append(render_average_pie(avg_df))
 
     doc = PdfPages("/Users/Malcolm/Desktop/mytest.pdf")
     for figure in figures:
