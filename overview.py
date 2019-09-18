@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
@@ -14,23 +15,32 @@ register_matplotlib_converters()
 
 
 csv_file = "/Users/Malcolm/Desktop/pcbanking.csv"
+output_pdf = "/Users/Malcolm/Desktop/mytest.pdf"
 header = "date,place,amount"
 
-Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia foods", "whole foods"]
-Transport = ["car2go", "evo", "avis", "rentals", "petrocan", "husky", "[^a-z]esso", "super save", "cab[^a-rt-z]",
-             "compass", "taxi", "shell"]
+Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia foods", "whole foods",
+             "organic acres market", "danial market", "choices", "safeway"]
+
+Transport = ["car2go", "evo car share", "avis", "rentals", "petrocan", "husky", "[^a-z]esso",
+             "super save", "cab[^a-rt-z]",  "compass", "taxi", "shell", "poparide", "uber", "lyft", "amtrack", "boltbus"]
+
 Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
               "moxie's", "burger", "la belle patate", "pho", "pizza", "bestie",
               "kitchen", "thai", "el camino's", "grill", "ice cream", "japanese",
-              "kaori izakaya", "taco", "mexican", "zipang provisions", "mr. steak", "poke", "sushi", "earls"
+              "kaori izakaya", "taco", "mexican", "zipang provisions", "mr. steak", "poke", "sushi", "earls",
               "mcdonald's", "diner", "subway sandwiches", "falafel", "donair", "fish", "pizz", "poutine",
-              "white spot", "vij's", "the capital", "cactus club", "cantina", "fork", "denny's", "mumbai local"
-              "freshii", "captain's boil", "korean", "salade de fruits", "a & w"]
+              "white spot", "vij's", "the capital", "cactus club", "cantina", "fork", "denny's", "mumbai local",
+              "freshii", "captain's boil", "korean", "salade de fruits", "a & w", "ebisu", "mcdonald's", "cuchillo",
+              "joe fortes", "the templeton", "freshii", "catering", "mary's", "meat & bread", "church's chicken",
+              "rosemary rocksalt", "food", "deli", "red robin", "food", "snack", "banter room", "tap house"]
+
 Coffee = ["cafe", "coffee", "tim hortons", "starbucks", "bean", "birds & the beets", "the mighty oak",
-          "le marche st george", "caffe", "coco and olive", "buro", "blenz", "green horn", "bakery"]
+          "le marche st george", "caffe", "coco et olive", "buro", "blenz", "green horn", "bakery", "revolver",
+          "cardero bottega", "the anchor eatery", "savary island pie", "pie", "red umbrella"]
+
 Bar = ["brew", "beer", "pub[^a-z]", "steamworks", "distillery", "bar[^a-z]", "narrow lounge", "rumpus room",
        "five point", "score on davie", "tap & barrel", "the cambie", "colony", "alibi room", "local ",
-       "per se social corner", "grapes & soda"]
+       "per se social corner", "grapes & soda", "portland craft", "the new oxford", "keefer", "liquor", "wine", "tapshack"]
 
 GROCERIES = 'groceries'
 TRANSPORT = 'transport'
@@ -39,7 +49,14 @@ COFFEE = 'coffee'
 BAR = 'bar'
 MISC = 'misc'
 
-colours = ['#5DADE2', '#F5B041', '#58D68D', '#EC7063', '#BB8FCE', '#808B96', '#F7DC6F']
+colours = ['#5DADE2',  # blue
+           '#F5B041',  # orange
+           '#58D68D',  # green
+           '#EC7063',  # red
+           '#BB8FCE',  # purple
+           '#808B96',  # grey
+           '#F7DC6F']  # yellow
+
 figures = []
 
 # prepend header to csv if needed
@@ -57,9 +74,11 @@ if do_modify:  # add header if needed
     with open(csv_file, 'w') as file:
         file.write(header + '\n' + data)
 
+print("Read CSV file...")
 # Extract csv into dataframe
 all_spending_df = pd.read_csv(filepath_or_buffer=csv_file, sep=',')
 
+print("Remove incomes, standardize text and date")
 # Remove all incomes
 all_spending_df = all_spending_df[all_spending_df.amount < 0]
 
@@ -88,6 +107,7 @@ def populate(_df, row):
 
 # Parse all spending and populate smaller dataframes by categories
 def organise_data_by_category(my_dataframe):
+    print("Organise spendings into categories")
     df_groc = df_trans = df_rest = df_coffee = \
         df_bar = df_misc = pd.DataFrame(columns=['date', 'place', 'amount'])
 
@@ -129,6 +149,7 @@ def organise_data_by_category(my_dataframe):
 
 # Create a small dataframe where each month is associated with a total of spending
 def extract_monthly_spending(_df, spending):
+    print("Extract monthly spendings for {}".format(spending))
     df_temp = pd.DataFrame(columns=['date', 'amount'])
 
     max_year = all_spending_df['date'].max().year
@@ -197,6 +218,7 @@ def render_monthly_bar_by_cat(_df_list):
 
     i = 0
     for el in _df_list:
+        print("Render monthy spending on bar graph for {}".format(el.name))
         bar = ax[i].bar(el.index.values,
                         el['amount'],
                         color=colours[i],
@@ -251,7 +273,8 @@ def render_monthly_bar_by_cat(_df_list):
     return fig
 
 
-def render_monthly_bar_total(_df_list):
+def render_monthly_bar_stacked(_df_list):
+    print("Render monthy spending on stack graph for all categories")
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
 
     bottom_value = 0
@@ -293,6 +316,7 @@ def render_monthly_bar_total(_df_list):
 
 
 def render_average_pie(_df):
+    print("Render average spending by category on pie chart")
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     explodes = [0.0] * len(_df)
     explodes[0] = 0.2
@@ -302,6 +326,7 @@ def render_average_pie(_df):
                              shadow=False,
                              frame=False,
                              startangle=90,
+                             colors=colours,
                              textprops={'fontsize': 'xx-large'},
                              wedgeprops={'linewidth': 1, 'edgecolor': "black"})
     ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
@@ -327,7 +352,7 @@ if __name__ == "__main__":
                         monthly_coffee, monthly_bar, monthly_misc]
 
     figures.append(render_monthly_bar_by_cat(monthly_spending))
-    figures.append(render_monthly_bar_total(monthly_spending))
+    figures.append(render_monthly_bar_stacked(monthly_spending))
 
     avg_df = df_tmp = pd.DataFrame(columns=['name', 'amount'])
 
@@ -337,7 +362,15 @@ if __name__ == "__main__":
 
     figures.append(render_average_pie(avg_df))
 
-    doc = PdfPages("/Users/Malcolm/Desktop/mytest.pdf")
+    doc = PdfPages(output_pdf)
     for figure in figures:
         figure.savefig(doc, format='pdf')
     doc.close()
+    print("Output PDF document: {}".format(output_pdf))
+
+    if len(sys.argv) > 1 and sys.argv[1].lower() == "debug":
+        print("\n--- DEBUG ---")
+        print("Content of full dataframe organized by categories \n")
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            print(data)
+
