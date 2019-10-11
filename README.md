@@ -322,6 +322,39 @@ def autolabel(rects, ax, height):
 ![Bar charts](https://github.com/malcolmdimeglio/banking/blob/master/img/bar_values.png)
 
 #### Stacked bar chart of all categories per month
+The stacked chart shows the same information as the 6 bar charts from the previous section. However, by stacking all spending of all categories of the same month together, we can extrapolate the overtime spending tendency.
 ![Bar charts](https://github.com/malcolmdimeglio/banking/blob/master/img/stacked_bar_chart.png)
+The logic here is to simply execute the same as for the single category bar char per graph (see above). But, in this case, instead of starting to plot on another graph when displaying the new category, we use the same figure and offset the bottom by the value ploted previously for the previous category.
+```python
+bottom_value = 0
+    for index, el in enumerate(_df_list):
+        bar = ax.bar(el.index.values,
+                     el['amount'],
+                     color=colours[index],
+                     label=el.name,
+                     bottom=bottom_value,
+                     width=150 * (1 / el.shape[0]))
+        bottom_value += _df_list[index]['amount']
+ ```
 #### Pie chart of average spending per category
 ![Bar charts](https://github.com/malcolmdimeglio/banking/blob/master/img/pie_chart.png)
+This chart allows to see the proportion each category has compared to the overall spending.
+The dev logic behind this pie chart is exactly the same as the previous chart explained above, except the 
+```python
+_, _, autotexts = ax.pie(_df['amount'], labels=_df['name'],
+                         explode=explodes,
+                         autopct='%1.1f%%',
+                         shadow=False,
+                         frame=False,
+                         startangle=90,
+                         colors=colours,
+                         textprops={'fontsize': 'xx-large'},
+                         wedgeprops={'linewidth': 1, 'edgecolor': "black"})
+```
+The explode argument we can see above recieves a list of float as parameter. The list must be as long as the number of category polted in the pie chart. 
+The float value represents how much the correspondig pie piece is being "exploded" or pulled out of the pie.
+0.2 has been arbitrarily selected after a few visual tests.
+```python
+explodes = [0.0] * len(_df)
+explodes[0] = 0.2
+```
