@@ -108,32 +108,48 @@ def populate(_df, row):
 # Parse all spending and populate smaller dataframes by categories
 def organise_data_by_category(my_dataframe):
     print("Organise spendings into categories")
-    df_groc = df_trans = df_rest = df_coffee = \
-        df_bar = df_misc = pd.DataFrame(columns=['date', 'place', 'amount'])
+
+    # it is 3 times faster to create a dataframe from a full dictionary rather than appending rows after rows to an already existing dataframe
+    dic_groc, dic_trans, dic_rest, dic_coffee, \
+        dic_bar, dic_misc = {}, {}, {}, {}, {}, {}
+    g, t, r, c, b, m = [0]*6  # indexes
 
     for index, row in my_dataframe.iterrows():
         if is_row_in_category(row, Groceries):
-            df_groc = populate(df_groc, row)
+            dic_groc[g] = row
+            g = g+1
             continue
 
         if is_row_in_category(row, Transport):
-            df_trans = populate(df_trans, row)
+            dic_trans[t] = row
+            t = t+1
             continue
 
         if is_row_in_category(row, Restaurant):
-            df_rest = populate(df_rest, row)
+            dic_rest[r] = row
+            r = r+1
             continue
 
         if is_row_in_category(row, Coffee):
-            df_coffee = populate(df_coffee, row)
+            dic_coffee[c] = row
+            c = c+1
             continue
 
         if is_row_in_category(row, Bar):
-            df_bar = populate(df_bar, row)
+            dic_bar[b] = row
+            b = b+1
             continue
 
         # If none of the above then let's put it in misc spending
-        df_misc = populate(df_misc, row)
+        dic_misc[m] = row
+        m = m+1
+
+    df_groc = pd.DataFrame.from_dict(dic_groc, orient='index', columns=['date', 'place', 'amount'])
+    df_trans = pd.DataFrame.from_dict(dic_trans, orient='index', columns=['date', 'place', 'amount'])
+    df_rest = pd.DataFrame.from_dict(dic_rest, orient='index', columns=['date', 'place', 'amount'])
+    df_coffee = pd.DataFrame.from_dict(dic_coffee, orient='index', columns=['date', 'place', 'amount'])
+    df_bar = pd.DataFrame.from_dict(dic_bar, orient='index', columns=['date', 'place', 'amount'])
+    df_misc = pd.DataFrame.from_dict(dic_misc, orient='index', columns=['date', 'place', 'amount'])
 
     all_df = {
         GROCERIES: df_groc,
