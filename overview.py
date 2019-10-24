@@ -194,8 +194,13 @@ def autolabel(rects, ax, height):
                     va='bottom')
 
 
-def compute_average(_df):
+def compute_average(_df, period_months=0):
     today = date.today()
+
+    # Allows to compute the average over the last period_months time
+    if period_months > 0:
+      from_date = today - pd.DateOffset(months=period_months)
+      _df = _df.drop(_df[_df.index < pd.to_datetime(from_date)].index)
 
     # To calculate the average, let's get rid of the extremums, the current month and all 0$ spending months
     _df = _df.drop(_df[_df.amount == _df.amount.max()].index)
@@ -227,6 +232,7 @@ def render_monthly_bar_by_cat(_df_list):
 
         # Plot the average monthly spending on the corresponding graph
         _, _, avg = compute_average(el)
+        _, _, avg6 = compute_average(el, period_months=6)
         ax[i].axhline(y=int(avg.amount),
                       color="red",
                       linewidth=0.5,
@@ -239,6 +245,19 @@ def render_monthly_bar_by_cat(_df_list):
                        ha='right',
                        va='bottom',
                        color='red')
+
+        ax[i].axhline(y=int(avg6.amount),
+                      color="blue",
+                      linewidth=0.5,
+                      label='avg 6 months',
+                      linestyle='--')
+        ax[i].annotate('{}'.format(int(avg6.amount)),
+                       xy=(monthly_coffee.index[0], int(avg6.amount)),
+                       xytext=(-10, 1),  # 3 points vertical offset
+                       textcoords="offset points",
+                       ha='right',
+                       va='bottom',
+                       color='blue')
 
         # 45 deg angle for X labels
         plt.setp(ax[i].get_xticklabels(),
