@@ -88,11 +88,6 @@ The data frame will then looks like such
 
 ### Organising the data
 Now we need to organise the data into categories, so that the rendering makes more sense. In order to dispatch all spendings in the right category some key words are used in order to differenciate them all.
-Each category will have its own dataframe:
-```python
-df_groc = df_trans = df_rest = df_coffee = \
-        df_bar = df_misc = pd.DataFrame(columns=['date', 'place', 'amount'])
-```
 
 You will find the list of keyword at the begining of the script
 ```python
@@ -136,9 +131,26 @@ The second line shows:
 Which we can connect the `place` field to the key word `tim hortons` in the `Coffee` list.
 And so on...
 
+
+Each category will have its own dataframe. However, it is up to 3 times faster to populate dictionaries and then create a dataframe out of them, than creating empty dataframes and appending rows one after the other.
+```python
+dic_groc, dic_trans, dic_rest, dic_coffee, \
+        dic_bar, dic_misc = {}, {}, {}, {}, {}, {}
+g, t, r, c, b, m = [0]*6  # indexes
+```
+
+As an example for the *groceries* category: for each row we check via `is_row_in_category()` if the place mentioned is part of the list Groceries, just listed above. If yes, then let's create a new entry in the dictionary with the key being an index incrementing each time, and the value being the row we're currently looking at.
+```python
+for index, row in my_dataframe.iterrows():
+        if is_row_in_category(row, Groceries):
+            dic_groc[g] = row
+            g = g+1
+            continue
+```
+
 If the `place` field doesn't match with any keyword of any category then the spending will go into the misc category.
 
-After parsing all the spendings, we will get 6 different dataframes for 6 categories (Groceries, Transport, Restaurant, Coffee, Bar and Misc) that we'll store in a dictionary:
+After parsing all the spendings, we will get 6 different dataframes for 6 categories (Groceries, Transport, Restaurant, Coffee, Bar and Misc) that we'll create the dataframes and store them store in a dictionary:
 
 ``` python
 GROCERIES = 'groceries'
@@ -147,6 +159,11 @@ RESTAURANT = 'restaurant'
 COFFEE = 'coffee'
 BAR = 'bar'
 MISC = 'misc'
+
+df_groc = pd.DataFrame.from_dict(dic_groc, orient='index', columns=['date', 'place', 'amount'])
+df_trans = pd.DataFrame.from_dict(dic_trans, orient='index', columns=['date', 'place', 'amount'])
+...
+df_misc = pd.DataFrame.from_dict(dic_misc, orient='index', columns=['date', 'place', 'amount'])
 
 all_df = {
     GROCERIES: df_groc,
@@ -268,12 +285,19 @@ for el in _df_list:
                     label='monthly',
                     width=150 * (1 / el.shape[0]))
  ```
- Each graph displays an horizontal red line representing the average spending per month for that category. This allows to get an idea if we happened to spend more than usual on a specific month. The average is computed by: 
+ Each graph displays an horizontal red line representing the average spending per month for that category over all time spending. In blue, is displayed the average over the last 6 months. This allows to get an idea if we happened to spend more than usual on a specific month. The average is computed by: 
  * Ommiting the current month. Since it's highly likely that there will be more expenses happening. Therefore the value might throw the computation off
  * Omitting the extremums. The maximum and minum spending ever recorded are not representative of the average and sometimes can tottaly give a false impression.
  * Omitting all $0 months as they are most likely due to a lack of data and not an extrem show of self restraint.
+ * When computing the average over the last 6 months, first, we get rid of all expenses older than 6 months then, we remove the min and max spending months
+ 
+ The `compute_average()` method allows an optional parametter *period_months* defaulted to 0. Any positive value represent how far back (in months) should we go to compute the average spending.
  ```python
- _df = _df.drop(_df[_df.amount == _df.amount.max()].index)
+ if period_months > 0:
+      from_date = today - pd.DateOffset(months=int(period_months))
+      _df = _df.drop(_df[_df.index < pd.to_datetime(from_date)].index)
+
+_df = _df.drop(_df[_df.amount == _df.amount.max()].index)
 _df = _df.drop(_df[_df.amount == _df.amount.min()].index)
 _df = _df.drop(_df[(_df.index.month == today.month) & (_df.index.year == today.year)].index)
 _df = _df.drop(_df[_df.amount == 0].index)
@@ -288,6 +312,12 @@ ax[i].axhline(y=int(avg.amount),
               color="red",
               linewidth=0.5,
               label='avg',
+              linestyle='--')
+
+ax[i].axhline(y=int(avg6.amount),
+              color="blue",
+              linewidth=0.5,
+              label='avg 6 months',
               linestyle='--')
 ```
 
