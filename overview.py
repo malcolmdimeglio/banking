@@ -89,6 +89,15 @@ all_spending_df['date'] = pd.to_datetime(all_spending_df['date'])
 
 
 # Check if a given row is part of the given category
+
+
+# @brief      Determines if row['place'] is in the given category.
+#
+# @param      my_row   Single row [date,place,amount] of a dataframe
+# @param      my_list  Category list
+#
+# @return     True if row in category, False otherwise.
+#
 def is_row_in_category(my_row, my_list):
     for el in my_list:
         if re.search(el, my_row['place']):
@@ -96,7 +105,13 @@ def is_row_in_category(my_row, my_list):
     return False
 
 
-# Populate a given dataframe with a given row
+# @brief      Populate a given dataframe with a given row
+#
+# @param      _df   Dataframe to populate
+# @param      row   Row to be added to the provided dataframe
+#
+# @return     The updated dataframe
+#
 def populate(_df, row):
     _df = _df.append({'date': row['date'],
                       'place': row['place'],
@@ -105,7 +120,13 @@ def populate(_df, row):
     return _df
 
 
-# Parse all spending and populate smaller dataframes by categories
+#
+# @brief      Parse all spending and populate smaller dataframes by categories
+#
+# @param      my_dataframe  Unparsed dataframe with all uncategorized expenses
+#
+# @return     A dictionary of dataframe. [key] = category name; [value] = dataframe with the all categorie's related expenses
+#
 def organise_data_by_category(my_dataframe):
     print("Organise spendings into categories")
 
@@ -114,6 +135,7 @@ def organise_data_by_category(my_dataframe):
         dic_bar, dic_misc = {}, {}, {}, {}, {}, {}
     g, t, r, c, b, m = [0]*6  # indexes
 
+    # Let's go over each rows of the unsorted dataframe and populate the category's dictionary.
     for index, row in my_dataframe.iterrows():
         if is_row_in_category(row, Groceries):
             dic_groc[g] = row
@@ -163,17 +185,29 @@ def organise_data_by_category(my_dataframe):
     return all_df
 
 
-# Create a small dataframe where each month is associated with a total of spending
-def extract_monthly_spending(_df, spending):
-    print("Extract monthly spendings for {}".format(spending))
+# @brief      Sumarize for each month the total spending for a given category
+#
+# @param      _df       An organized by category dataframe
+# @param      category  The category name you want to extract the information of
+#
+# @return     A dataframe with only 1 category's information and the sum of all the spendings for that category, listed by month
+#
+def extract_monthly_spending(_df, category):
+    print("Extract monthly spendings for {}".format(category))
     df_temp = pd.DataFrame(columns=['date', 'amount'])
 
+    if _df[category].empty:
+        df_temp.name = category
+        return df_temp
+
+    # let's only do the math between the first and last spending day in the csv file to avoid
+    # blank values at the begining and the end of the charts
+    #
     max_year = all_spending_df['date'].max().year
     min_year = all_spending_df['date'].min().year
     min_month = all_spending_df['date'].min().month
     max_month = all_spending_df['date'].max().month
 
-    # let's only do the math between the first and last spending day in the csv file.
     for year in range(min_year, max_year + 1):
         if year == min_year:
             start_month = min_month
@@ -188,19 +222,23 @@ def extract_monthly_spending(_df, spending):
         # sum all spending from a whole month, each month of the year
         for month in range(start_month, end_month + 1):
             df_temp = df_temp.append({"date": "{}-{}".format(month, year),
-                                     "amount": _df[spending].loc[(_df[spending].date.dt.month == month) &
-                                                                 (_df[spending].date.dt.year == year), 'amount'].sum()},
+                                     "amount": _df[category].loc[(_df[category].date.dt.month == month) &
+                                                                 (_df[category].date.dt.year == year), 'amount'].sum()},
                                      ignore_index=True)
-
+    df_temp.name = category
     df_temp['date'] = pd.to_datetime(df_temp['date'])
     df_temp.set_index('date', inplace=True)
-    df_temp.name = spending
 
     return df_temp
 
-
+#
+# @brief      Attach a text label above each ploted bar.
+#
+# @param      rects   The rectangles (each ploted bar)
+# @param      ax      Axis
+# @param      height  The height (monthy $ value)
+#
 def autolabel(rects, ax, height):
-    """Attach a text label above each bar in *rects*, displaying its height."""
     for index, rect in enumerate(rects):
         ax.annotate('{}'.format(int(height[index])),
                     xy=(rect.get_x() + rect.get_width() / 2, height[index]),
@@ -210,12 +248,20 @@ def autolabel(rects, ax, height):
                     va='bottom')
 
 
+#
+# @brief      Calculates the average.
+#
+# @param      _df            The dataframe to extract the spending mean value of
+# @param      period_months  The period months from today's date to calculate the average of
+#
+# @return     The average spending over the las 'period_months'. Also return min and max value over the same period of time
+#
 def compute_average(_df, period_months=0):
     today = date.today()
 
     # Allows to compute the average over the last period_months time
     if period_months > 0:
-      from_date = today - pd.DateOffset(months=period_months)
+      from_date = today - pd.DateOffset(months=int(period_months))
       _df = _df.drop(_df[_df.index < pd.to_datetime(from_date)].index)
 
     # To calculate the average, let's get rid of the extremums, the current month and all 0$ spending months
@@ -227,6 +273,13 @@ def compute_average(_df, period_months=0):
     return _df.min(), _df.max(), _df.mean()
 
 
+#
+# @brief      Will plot a bar chart for each category. X axis will be scaled by month.
+#
+# @param      _df_list  List that contains each categorie's dataframe spending per month
+#
+# @return     The figure with all the charts
+#
 def render_monthly_bar_by_cat(_df_list):
     # 3 columns display
     col = 3
@@ -308,6 +361,13 @@ def render_monthly_bar_by_cat(_df_list):
     return fig
 
 
+#
+# @brief      Will plot a stacked bar chart. Displaying the total amount of spending per month, stacking all categories together
+#
+# @param      _df_list  List that contains each categorie's dataframe spending per month
+#
+# @return     The figure with the calculated chart
+#
 def render_monthly_bar_stacked(_df_list):
     print("Render monthy spending on stack graph for all categories")
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
@@ -349,7 +409,13 @@ def render_monthly_bar_stacked(_df_list):
     plt.tight_layout(w_pad=200, h_pad=500)
     return fig
 
-
+#
+# @brief      Will plot a pie chart representing the proportion of spending by category
+#
+# @param      _df   A dataframe contaning the average overall spending by category
+#
+# @return     The figure with the calculated chart
+#
 def render_average_pie(_df):
     print("Render average spending by category on pie chart")
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
