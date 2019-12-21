@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import sys
+import sys, os
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
@@ -8,6 +8,7 @@ import math
 from datetime import date
 import matplotlib.dates as mdates
 from matplotlib.backends.backend_pdf import PdfPages
+import numpy
 
 # To get rid of pandas' matplotlib "FutureWarning"
 from pandas.plotting import register_matplotlib_converters
@@ -60,12 +61,16 @@ colours = ['#5DADE2',  # blue
 figures = []
 
 # prepend header to csv if needed
-with open(csv_file, 'r') as file:
-    data = file.readline()  # read the first line
-    if re.search(header, data):  # if header is present then do not modify the csv file
-        do_modify = False
-    else:
-        do_modify = True
+try:
+  with open(csv_file, 'r') as file:
+      data = file.readline()  # read the first line
+      if re.search(header, data):  # if header is present then do not modify the csv file
+          do_modify = False
+      else:
+          do_modify = True
+except FileNotFoundError:
+    print('** ERROR ** File {} not found'.format(csv_file))
+    sys.exit()
 
 with open(csv_file, 'r') as file:
     data = file.read()
@@ -81,6 +86,10 @@ all_spending_df = pd.read_csv(filepath_or_buffer=csv_file, sep=',')
 print("Remove incomes, standardize text and date")
 # Remove all incomes
 all_spending_df = all_spending_df[all_spending_df.amount < 0]
+if all_spending_df.empty:
+    print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
+    \nPlease check the content of {}".format(os.path.basename(csv_file)))
+    exit()
 
 # Change spending into positive values, lower case the 'place' column and datetime format for the 'date' column
 all_spending_df['amount'] = all_spending_df['amount'].apply(lambda x: -x)
@@ -203,10 +212,12 @@ def extract_monthly_spending(_df, category):
     # let's only do the math between the first and last spending day in the csv file to avoid
     # blank values at the begining and the end of the charts
     #
-    max_year = all_spending_df['date'].max().year
+    # max_year = all_spending_df['date'].max().year
+    max_year = date.today().year
     min_year = all_spending_df['date'].min().year
     min_month = all_spending_df['date'].min().month
-    max_month = all_spending_df['date'].max().month
+    # max_month = all_spending_df['date'].max().month
+    max_month = date.today().month
 
     for year in range(min_year, max_year + 1):
         if year == min_year:
@@ -253,24 +264,44 @@ def autolabel(rects, ax, height):
 #
 # @param      _df            The dataframe to extract the spending mean value of
 # @param      period_months  The period months from today's date to calculate the average of
+# @param      absolute       Boolean. If False the average computation will no consider the min value and max value for calculation.
 #
 # @return     The average spending over the las 'period_months'. Also return min and max value over the same period of time
 #
-def compute_average(_df, period_months=0):
+def compute_average(_df, period_months=0, absolute=False):
     today = date.today()
 
     # Allows to compute the average over the last period_months time
     if period_months > 0:
-      from_date = today - pd.DateOffset(months=int(period_months))
-      _df = _df.drop(_df[_df.index < pd.to_datetime(from_date)].index)
+        from_date = today - pd.DateOffset(months=int(period_months))
+        from_date = _df.index.min() if from_date < _df.index.min() else from_date  # keep lower boundary at first date recorded
 
-    # To calculate the average, let's get rid of the extremums, the current month and all 0$ spending months
-    _df = _df.drop(_df[_df.amount == _df.amount.max()].index)
-    _df = _df.drop(_df[_df.amount == _df.amount.min()].index)
+        _df = _df.drop(_df[_df.index < pd.to_datetime(from_date)].index)
+
+    # To calculate the average, let's get rid of the extremums (only if we don't want an absolute average), the current month and all 0$ spending months
+    if not absolute:
+        _df = _df.drop(_df[_df.amount == _df.amount.max()].index)
+        _df = _df.drop(_df[_df.amount == _df.amount.min()].index)
     _df = _df.drop(_df[(_df.index.month == today.month) & (_df.index.year == today.year)].index)
     _df = _df.drop(_df[_df.amount == 0].index)
 
-    return _df.min(), _df.max(), _df.mean()
+    # Handles the cases where after dropping all the rows we end up with an empty dataframe
+    if numpy.isnan(_df.min().amount):
+        _min = 0
+    else:
+        _min = int(_df.min().amount)
+
+    if numpy.isnan(_df.max().amount):
+        _max = 0
+    else:
+        _max = int(_df.max().amount)
+
+    if numpy.isnan(_df.mean().amount):
+        _mean = 0
+    else:
+        _mean = int(_df.mean().amount)
+
+    return _min, _max, _mean
 
 
 #
@@ -293,42 +324,60 @@ def render_monthly_bar_by_cat(_df_list):
     i = 0
     for el in _df_list:
         print("Render monthy spending on bar graph for {}".format(el.name))
-        bar = ax[i].bar(el.index.values,
-                        el['amount'],
-                        color=colours[i],
-                        label='monthly',
-                        width=150 * (1 / el.shape[0]))
 
-        # Plot the average monthly spending on the corresponding graph
-        _, _, avg = compute_average(el)
-        _, _, avg6 = compute_average(el, period_months=6)
-        ax[i].axhline(y=int(avg.amount),
-                      color="red",
-                      linewidth=0.5,
-                      label='avg',
-                      linestyle='--')
-        ax[i].annotate('{}'.format(int(avg.amount)),
-                       xy=(monthly_coffee.index[0], int(avg.amount)),
-                       xytext=(-10, 1),  # 3 points vertical offset
-                       textcoords="offset points",
-                       ha='right',
-                       va='bottom',
-                       color='red')
+        if el.empty:
+            bar = ax[i].bar(date.today(),
+                            0,
+                            color=colours[i],
+                            label='monthly')
+            ax[i].annotate('NO DATA',
+                           xy=(date.today(), 0),
+                           xytext=(0, 0),  # 3 points vertical offset
+                           textcoords="offset points",
+                           ha='center',
+                           va='center',
+                           color='red',
+                           fontsize=50)
+        else:
+            bar = ax[i].bar(el.index.values,
+                            el['amount'],
+                            color=colours[i],
+                            label='monthly',
+                            width=150 * (1 / el.shape[0]))
 
-        ax[i].axhline(y=int(avg6.amount),
-                      color="blue",
-                      linewidth=0.5,
-                      label='avg 6 months',
-                      linestyle='--')
-        ax[i].annotate('{}'.format(int(avg6.amount)),
-                       xy=(monthly_coffee.index[0], int(avg6.amount)),
-                       xytext=(-10, 1),  # 3 points vertical offset
-                       textcoords="offset points",
-                       ha='right',
-                       va='bottom',
-                       color='blue')
+            # Plot the average monthly spending on the corresponding graph
+            _, _, avg = compute_average(el)
+            _, _, avg6 = compute_average(el, period_months=6)
 
-        # 45 deg angle for X labels
+            if avg > 0:  # No need to plot the average if it's 0
+                ax[i].axhline(y=avg,
+                              color="red",
+                              linewidth=0.5,
+                              label='avg',
+                              linestyle='--')
+                ax[i].annotate('{}'.format(avg),
+                               xy=(el.index[0], avg),
+                               xytext=(-10, 1),  # 3 points vertical offset
+                               textcoords="offset points",
+                               ha='right',
+                               va='bottom',
+                               color='red')
+            if avg6 > 0:  # No need to plot the average if it's 0
+                ax[i].axhline(y=avg6,
+                              color="blue",
+                              linewidth=0.5,
+                              label='avg 6 months',
+                              linestyle='--')
+                ax[i].annotate('{}'.format(avg6),
+                               xy=(el.index[0], avg6),
+                               xytext=(-10, 1),  # 3 points vertical offset
+                               textcoords="offset points",
+                               ha='right',
+                               va='bottom',
+                               color='blue')
+            autolabel(bar, ax[i], el['amount'])
+
+            # 45 deg angle for X labels
         plt.setp(ax[i].get_xticklabels(),
                  rotation=45,
                  ha="right")
@@ -350,7 +399,6 @@ def render_monthly_bar_by_cat(_df_list):
         ax[i].xaxis.set_major_formatter(fmt)
         ax[i].legend()
 
-        autolabel(bar, ax[i], el['amount'])
         i += 1
 
     # Remove unused plots
@@ -373,14 +421,31 @@ def render_monthly_bar_stacked(_df_list):
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
 
     bottom_value = 0
+    empty_chart = True
     for index, el in enumerate(_df_list):
-        bar = ax.bar(el.index.values,
-                     el['amount'],
-                     color=colours[index],
-                     label=el.name,
-                     bottom=bottom_value,
-                     width=150 * (1 / el.shape[0]))
-        bottom_value += _df_list[index]['amount']
+        if not el.empty:
+            empty_chart = False
+            bar = ax.bar(el.index.values,
+                         el['amount'],
+                         color=colours[index],
+                         label=el.name,
+                         bottom=bottom_value,
+                         width=150 * (1 / el.shape[0]))
+            bottom_value += _df_list[index]['amount']
+
+    if empty_chart:
+        bar = ax.bar(date.today(),
+                    0,
+                    color=colours[i],
+                    label='monthly')
+        ax.annotate('NO DATA',
+                    xy=(date.today(), 0),
+                    xytext=(0, 0),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center',
+                    va='center',
+                    color='red',
+                    fontsize=50)
 
     autolabel(bar, ax, bottom_value)
 
@@ -416,12 +481,20 @@ def render_monthly_bar_stacked(_df_list):
 #
 # @return     The figure with the calculated chart
 #
-def render_average_pie(_df):
+def render_average_pie(_df_list):
     print("Render average spending by category on pie chart")
+
+    avg_df = pd.DataFrame(columns=['name', 'amount'])
+
+    for el in _df_list:
+        if not el.empty:  # Do not handle categories with no data
+            _, _, average = compute_average(el, absolute=True)
+            avg_df = avg_df.append({'name': el.name, 'amount': average}, ignore_index=True)
+
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
-    explodes = [0.0] * len(_df)
+    explodes = [0.0] * len(avg_df)
     explodes[0] = 0.2
-    _, _, autotexts = ax.pie(_df['amount'], labels=_df['name'],
+    _, _, autotexts = ax.pie(avg_df['amount'], labels=avg_df['name'],
                              explode=explodes,
                              autopct='%1.1f%%',
                              shadow=False,
@@ -430,9 +503,9 @@ def render_average_pie(_df):
                              colors=colours,
                              textprops={'fontsize': 'xx-large'},
                              wedgeprops={'linewidth': 1, 'edgecolor': "black"})
+
     ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
     plt.setp(autotexts, size=15, weight="bold")
-
     ax.set_title("Proportion in spending")
     ax.title.set_weight('extra bold')
     ax.title.set_fontsize('xx-large')
@@ -452,16 +525,10 @@ if __name__ == "__main__":
     monthly_spending = [monthly_groceries, monthly_transport, monthly_restaurant,
                         monthly_coffee, monthly_bar, monthly_misc]
 
+
     figures.append(render_monthly_bar_by_cat(monthly_spending))
     figures.append(render_monthly_bar_stacked(monthly_spending))
-
-    avg_df = df_tmp = pd.DataFrame(columns=['name', 'amount'])
-
-    for cat in monthly_spending:
-        _, _, average = compute_average(cat)
-        avg_df = avg_df.append({'name': cat.name, 'amount': average}, ignore_index=True)
-
-    figures.append(render_average_pie(avg_df))
+    figures.append(render_average_pie(monthly_spending))
 
     doc = PdfPages(output_pdf)
     for figure in figures:
