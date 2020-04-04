@@ -556,6 +556,9 @@ def render_average_pie(_df_list):
 
 
 if __name__ == "__main__":
+    if not (os.path.exists(os.path.dirname(output_pdf))):
+        print(f"Could not access {os.path.dirname(output_pdf)} to output the results. Please verify path syntax")
+        sys.exit()
     try:
         tmp_list = []
         for file in os.listdir(csv_folder):
@@ -599,7 +602,6 @@ if __name__ == "__main__":
     figures.append(render_monthly_bar_stacked(monthly_spending))
     figures.append(render_average_pie(monthly_spending))
 
-    # TODO: Check output_pdf valid path to file
     doc = PdfPages(output_pdf)
     for figure in figures:
         figure.savefig(doc, format='pdf')
