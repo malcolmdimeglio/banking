@@ -15,9 +15,9 @@ from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
 
-csv_file = "/Users/Malcolm/Desktop/pcbanking.csv"
-output_pdf = "/Users/Malcolm/Desktop/mytest.pdf"
-header = "date,place,amount"
+csv_folder = os.path.dirname(os.path.abspath(__file__)) + "/statements"
+output_pdf = os.path.dirname(os.path.abspath(__file__)) + "/statements/overview.pdf"
+header = ["date","place","amount"]
 
 Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia foods", "whole foods",
              "organic acres market", "danial market", "choices", "safeway"]
@@ -57,47 +57,6 @@ colours = ['#5DADE2',  # blue
            '#BB8FCE',  # purple
            '#808B96',  # grey
            '#F7DC6F']  # yellow
-
-figures = []
-
-# prepend header to csv if needed
-try:
-  with open(csv_file, 'r') as file:
-      data = file.readline()  # read the first line
-      if re.search(header, data):  # if header is present then do not modify the csv file
-          do_modify = False
-      else:
-          do_modify = True
-except FileNotFoundError:
-    print('** ERROR ** File {} not found'.format(csv_file))
-    sys.exit()
-
-with open(csv_file, 'r') as file:
-    data = file.read()
-
-if do_modify:  # add header if needed
-    with open(csv_file, 'w') as file:
-        file.write(header + '\n' + data)
-
-print("Read CSV file...")
-# Extract csv into dataframe
-all_spending_df = pd.read_csv(filepath_or_buffer=csv_file, sep=',')
-
-print("Remove incomes, standardize text and date")
-# Remove all incomes
-all_spending_df = all_spending_df[all_spending_df.amount < 0]
-if all_spending_df.empty:
-    print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
-    \nPlease check the content of {}".format(os.path.basename(csv_file)))
-    exit()
-
-# Change spending into positive values, lower case the 'place' column and datetime format for the 'date' column
-all_spending_df['amount'] = all_spending_df['amount'].apply(lambda x: -x)
-all_spending_df['place'] = all_spending_df["place"].apply(lambda x: x.lower())
-all_spending_df['date'] = pd.to_datetime(all_spending_df['date'])
-
-
-# Check if a given row is part of the given category
 
 
 # @brief      Determines if row['place'] is in the given category.
@@ -474,6 +433,7 @@ def render_monthly_bar_stacked(_df_list):
     plt.tight_layout(w_pad=200, h_pad=500)
     return fig
 
+
 #
 # @brief      Will plot a pie chart representing the proportion of spending by category
 #
@@ -493,7 +453,7 @@ def render_average_pie(_df_list):
 
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     explodes = [0.0] * len(avg_df)
-    explodes[0] = 0.2
+    explodes[0] = 0.2  # select the 0 index to explode the piece of the pie. The value has been determined by visual tests
     _, _, autotexts = ax.pie(avg_df['amount'], labels=avg_df['name'],
                              explode=explodes,
                              autopct='%1.1f%%',
@@ -514,6 +474,33 @@ def render_average_pie(_df_list):
 
 
 if __name__ == "__main__":
+    try:
+        tmp_list = []
+        for file in os.listdir(csv_folder):
+            if file.lower().endswith('.csv'):
+                csv_file = csv_folder + '/' + file
+                print(f"Read CSV file {file}...")
+                # Extract csv into dataframe
+                tmp_list.append(pd.read_csv(filepath_or_buffer=csv_file, sep=',', names=["date","place","amount"]))
+    except FileNotFoundError:
+        print('** ERROR ** File {} not found'.format(csv_file))
+        sys.exit()
+
+    all_spending_df = pd.concat(tmp_list, axis=0, ignore_index=True, sort=False)
+
+    print("Remove incomes, standardize text and date")
+    # Remove all incomes
+    all_spending_df = all_spending_df[all_spending_df.amount < 0]
+    if all_spending_df.empty:
+        print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
+        \nPlease check the content of {}".format(os.path.basename(csv_file)))
+        sys.exit()
+
+    # Change spending into positive values, lower case the 'place' column and datetime format for the 'date' column
+    all_spending_df['amount'] = all_spending_df['amount'].apply(lambda x: -x)  # Maybe more efficient not to and just do that at the very end when ploting the graph?
+    all_spending_df['place'] = all_spending_df["place"].apply(lambda x: x.lower())
+    all_spending_df['date'] = pd.to_datetime(all_spending_df['date'])
+
     data = organise_data_by_category(all_spending_df)
     monthly_groceries = extract_monthly_spending(data, GROCERIES)
     monthly_transport = extract_monthly_spending(data, TRANSPORT)
@@ -525,11 +512,12 @@ if __name__ == "__main__":
     monthly_spending = [monthly_groceries, monthly_transport, monthly_restaurant,
                         monthly_coffee, monthly_bar, monthly_misc]
 
-
+    figures = []
     figures.append(render_monthly_bar_by_cat(monthly_spending))
     figures.append(render_monthly_bar_stacked(monthly_spending))
     figures.append(render_average_pie(monthly_spending))
 
+    # TODO: Check output_pdf valid path to file
     doc = PdfPages(output_pdf)
     for figure in figures:
         figure.savefig(doc, format='pdf')
