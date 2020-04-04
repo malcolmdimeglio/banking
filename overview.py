@@ -610,5 +610,8 @@ if __name__ == "__main__":
         print("\n--- DEBUG ---")
         print("Content of full dataframe organized by categories \n")
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-            print(data)
+            # TODO: just print sorted by date, uniq, misc
+            for key,val in data.items():
+                print(f"{key.upper()}\n{val.sort_values(by=['date']).to_string(index=False)}")
+                print()
 
