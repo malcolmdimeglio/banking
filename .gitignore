@@ -72,7 +72,6 @@ target/
 # Jupyter Notebook
 *.ipynb*
 
-
 # pyenv
 .python-version
 
@@ -109,3 +108,6 @@ venv.bak/
 
 # macOS
 .DS_Store
+
+# inherent to project
+statements/
