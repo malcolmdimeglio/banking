@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import re
 import math
-from datetime import date
+from datetime import date, datetime
 import matplotlib.dates as mdates
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy
@@ -228,24 +228,32 @@ def autolabel(rects, ax, height):
 # @param      _df            The dataframe to extract the spending mean value of
 # @param      period_months  The period months from today's date to calculate the average of
 # @param      absolute       Boolean. If False the average computation will no consider the min value and max value for calculation.
+# @param      fromDay        Datetime type. Calculate average from this day and for {period_months}
 #
-# @return     The average spending over the las 'period_months'. Also return min and max value over the same period of time
+# @return     The average spending over the last 'period_months'. Also return min and max value over the same period of time
 #
-def compute_average(_df, period_months=0, absolute=False):
-    today = date.today()
+def compute_average(_df, period_months=0, absolute=False, fromDay=pd.datetime.now().date()):
+    #today = date.today()
 
     # Allows to compute the average over the last period_months time
     if period_months > 0:
-        from_date = today - pd.DateOffset(months=int(period_months))
-        from_date = _df.index.min() if from_date < _df.index.min() else from_date  # keep lower boundary at first date recorded
+        untilDay = fromDay - pd.DateOffset(months=int(period_months))
+        untilDay = untilDay.replace(day=1)
+        untilDay = _df.index.min() if untilDay < _df.index.min() else untilDay  # keep lower boundary at first date recorded
+    else:
+        untilDay = _df.index.min()
 
-        _df = _df.drop(_df[_df.index < pd.to_datetime(from_date)].index)
+    untilDay = untilDay.date()  # remove hour, minute, second
+
+    # drop everything not in the range [from;until]
+    _df = _df.drop(_df[_df.index < pd.to_datetime(untilDay)].index)
+    _df = _df.drop(_df[_df.index > pd.to_datetime(fromDay)].index)
 
     # To calculate the average, let's get rid of the extremums (only if we don't want an absolute average), the current month and all 0$ spending months
     if not absolute:
         _df = _df.drop(_df[_df.amount == _df.amount.max()].index)
         _df = _df.drop(_df[_df.amount == _df.amount.min()].index)
-    _df = _df.drop(_df[(_df.index.month == today.month) & (_df.index.year == today.year)].index)
+    _df = _df.drop(_df[(_df.index.month == date.today().month) & (_df.index.year == date.today().year)].index)
     _df = _df.drop(_df[_df.amount == 0].index)
 
     # Handles the cases where after dropping all the rows we end up with an empty dataframe
@@ -310,13 +318,17 @@ def render_monthly_bar_by_cat(_df_list):
 
             # Plot the average monthly spending on the corresponding graph
             _, _, avg = compute_average(el)
-            _, _, avg6 = compute_average(el, period_months=6)
+            _, _, avg6 = compute_average(el, period_months=7, absolute=True) # 7 since we never count the current month
+
+            _6MonthsAgo = date.today() - pd.DateOffset(months=6)
+            _, _, avgOlderThan6Months = compute_average(el, fromDay=_6MonthsAgo)
+
 
             if avg > 0:  # No need to plot the average if it's 0
                 ax[i].axhline(y=avg,
                               color="red",
                               linewidth=0.5,
-                              label='avg',
+                              label='all time avg',
                               linestyle='--')
                 ax[i].annotate('{}'.format(avg),
                                xy=(el.index[0], avg),
@@ -329,7 +341,7 @@ def render_monthly_bar_by_cat(_df_list):
                 ax[i].axhline(y=avg6,
                               color="blue",
                               linewidth=0.5,
-                              label='avg 6 months',
+                              label='avg past 6 months',
                               linestyle='--')
                 ax[i].annotate('{}'.format(avg6),
                                xy=(el.index[0], avg6),
@@ -338,6 +350,19 @@ def render_monthly_bar_by_cat(_df_list):
                                ha='right',
                                va='bottom',
                                color='blue')
+            if avgOlderThan6Months > 0:  # No need to plot the average if it's 0
+                ax[i].axhline(y=avgOlderThan6Months,
+                              color="green",
+                              linewidth=0.5,
+                              label='avg before 6 months',
+                              linestyle='--')
+                ax[i].annotate('{}'.format(avgOlderThan6Months),
+                               xy=(el.index[0], avgOlderThan6Months),
+                               xytext=(-10, 1),  # 3 points vertical offset
+                               textcoords="offset points",
+                               ha='right',
+                               va='bottom',
+                               color='green')
             autolabel(bar, ax[i], el['amount'])
 
             # 45 deg angle for X labels
@@ -409,8 +434,61 @@ def render_monthly_bar_stacked(_df_list):
                     va='center',
                     color='red',
                     fontsize=50)
+    else:
+        # Create a dataframe holding the total spendings per month, regardless of their category
+        tot_spending = pd.DataFrame(columns=['date', 'amount'])
+        tot_spending.set_index('date', inplace=True)
+        for _df in _df_list:
+            tot_spending = tot_spending.add(_df, fill_value=0)
 
-    autolabel(bar, ax, bottom_value)
+        # Plot the average monthly spending on the corresponding graph
+        _, _, avg = compute_average(tot_spending)
+        _, _, avg6 = compute_average(tot_spending, period_months=7, absolute=True)  # 7 since we never count the current month
+
+        _6MonthsAgo = date.today() - pd.DateOffset(months=6)
+        _, _, avgOlderThan6Months = compute_average(tot_spending, fromDay=_6MonthsAgo)
+
+        if avg > 0:  # No need to plot the average if it's 0
+            ax.axhline(y=avg,
+                          color="red",
+                          linewidth=0.5,
+                          label='all time avg',
+                          linestyle='--')
+            ax.annotate('{}'.format(avg),
+                           xy=(tot_spending.index[0], avg),
+                           xytext=(-10, 1),  # 3 points vertical offset
+                           textcoords="offset points",
+                           ha='right',
+                           va='bottom',
+                           color='red')
+        if avg6 > 0:  # No need to plot the average if it's 0
+            ax.axhline(y=avg6,
+                          color="blue",
+                          linewidth=0.5,
+                          label='avg past 6 months',
+                          linestyle='--')
+            ax.annotate('{}'.format(avg6),
+                           xy=(tot_spending.index[0], avg6),
+                           xytext=(-10, 1),  # 3 points vertical offset
+                           textcoords="offset points",
+                           ha='right',
+                           va='bottom',
+                           color='blue')
+        if avgOlderThan6Months > 0:  # No need to plot the average if it's 0
+            ax.axhline(y=avgOlderThan6Months,
+                          color="green",
+                          linewidth=0.5,
+                          label='avg before 6 months',
+                          linestyle='--')
+            ax.annotate('{}'.format(avgOlderThan6Months),
+                           xy=(tot_spending.index[0], avgOlderThan6Months),
+                           xytext=(-10, 1),  # 3 points vertical offset
+                           textcoords="offset points",
+                           ha='right',
+                           va='bottom',
+                           color='green')
+
+    autolabel(bar, ax, tot_spending['amount'])
 
     # 45 deg angle for X labels
     plt.setp(ax.get_xticklabels(),
