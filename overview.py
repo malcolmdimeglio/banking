@@ -1,14 +1,16 @@
 #! /usr/bin/env python3
 
 import sys, os
-import pandas as pd
-import matplotlib.pyplot as plt
 import re
 import math
-from datetime import date, datetime
-import matplotlib.dates as mdates
-from matplotlib.backends.backend_pdf import PdfPages
 import numpy
+import pandas as pd
+from pandas.tseries.offsets import MonthEnd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.markers as markers
+from matplotlib.backends.backend_pdf import PdfPages
+from datetime import date, datetime
 
 # To get rid of pandas' matplotlib "FutureWarning"
 from pandas.plotting import register_matplotlib_converters
@@ -226,28 +228,25 @@ def autolabel(rects, ax, height):
 # @brief      Calculates the average.
 #
 # @param      _df            The dataframe to extract the spending mean value of
-# @param      period_months  The period months from today's date to calculate the average of
+# @param      forMonths      The period months from today's date to calculate the average of
 # @param      absolute       Boolean. If False the average computation will no consider the min value and max value for calculation.
-# @param      fromDay        Datetime type. Calculate average from this day and for {period_months}
+# @param      endDay         Datetime type. Calculate average from this day and for {forMonths}
 #
-# @return     The average spending over the last 'period_months'. Also return min and max value over the same period of time
+# @return     The average spending over the last 'forMonths'. Also return min and max value over the same period of time
 #
-def compute_average(_df, period_months=0, absolute=False, fromDay=pd.datetime.now().date()):
-    #today = date.today()
-
-    # Allows to compute the average over the last period_months time
-    if period_months > 0:
-        untilDay = fromDay - pd.DateOffset(months=int(period_months))
-        untilDay = untilDay.replace(day=1)
-        untilDay = _df.index.min() if untilDay < _df.index.min() else untilDay  # keep lower boundary at first date recorded
+def compute_average(_df, forMonths=0, absolute=False, endDay=pd.datetime.now().date()):
+    # Allows to compute the average over the last forMonths time
+    if forMonths > 0:
+        fromDay = endDay - pd.DateOffset(months=int(forMonths))
+        fromDay = _df.index.min() if fromDay < _df.index.min() else fromDay  # keep lower boundary at first date recorded
     else:
-        untilDay = _df.index.min()
+        fromDay = _df.index.min()
 
-    untilDay = untilDay.date()  # remove hour, minute, second
+    fromDay = fromDay.date()  # remove hour, minute, second
 
     # drop everything not in the range [from;until]
-    _df = _df.drop(_df[_df.index < pd.to_datetime(untilDay)].index)
-    _df = _df.drop(_df[_df.index > pd.to_datetime(fromDay)].index)
+    _df = _df.drop(_df[_df.index < pd.to_datetime(fromDay)].index)
+    _df = _df.drop(_df[_df.index > pd.to_datetime(endDay)].index)
 
     # To calculate the average, let's get rid of the extremums (only if we don't want an absolute average), the current month and all 0$ spending months
     if not absolute:
@@ -317,16 +316,49 @@ def render_monthly_bar_by_cat(_df_list):
                             width=150 * (1 / el.shape[0]))
 
             # Plot the average monthly spending on the corresponding graph
+            # Let's plot past averages over multiple 6 months periods as well as an all time average
+
+            compute = True
+            # Start calculating from last month's last day
+            _endPeriod = date.today() - pd.DateOffset(months=1)
+            _endPeriod += MonthEnd(0)
+
+            _6monthsAvgDates = []
+            _6monthsAvgValues = []
+
+            while(compute):
+                _, _, avgOver6mth = compute_average(el, endDay=_endPeriod, forMonths=6, absolute=True)
+                _6monthsAvgValues.append(avgOver6mth)
+                _6monthsAvgDates.append(_endPeriod)
+
+                _endPeriod -= pd.DateOffset(months=6) # New end period moved back 6months
+                if _endPeriod <= el.index.min():  # We've reached the end of the dataframe
+                    _endPeriod = el.index.min()
+                    compute = False
+
+                _6monthsAvgDates.append(_endPeriod)
+                _6monthsAvgValues.append(avgOver6mth)
+
+            ax[i].plot(_6monthsAvgDates, _6monthsAvgValues,'-o',
+                        color='red',
+                        label=f"Avg over 6 months period")
+            for j, val in enumerate(zip(_6monthsAvgDates, _6monthsAvgValues)):
+                # _6monthsAvgDates is ordered from recent to old so the plot "starts" from the right
+                # We don't need to annotate twice the same value. let's skip one.
+                if j%2 > 0:
+                    ax[i].annotate('{}'.format(val[1]),
+                                   xy=val,
+                                   xytext=(-5, 1),  # 3 points vertical offset
+                                   textcoords="offset points",
+                                   ha='right',
+                                   va='bottom',
+                                   color='red')
+
+
             _, _, avg = compute_average(el)
-            _, _, avg6 = compute_average(el, period_months=7, absolute=True) # 7 since we never count the current month
-
-            _6MonthsAgo = date.today() - pd.DateOffset(months=6)
-            _, _, avgOlderThan6Months = compute_average(el, fromDay=_6MonthsAgo)
-
-
             if avg > 0:  # No need to plot the average if it's 0
                 ax[i].axhline(y=avg,
-                              color="red",
+                              color="blue",
                               linewidth=0.5,
                               label='all time avg',
                               linestyle='--')
@@ -336,33 +368,8 @@ def render_monthly_bar_by_cat(_df_list):
                                textcoords="offset points",
                                ha='right',
                                va='bottom',
-                               color='red')
-            if avg6 > 0:  # No need to plot the average if it's 0
-                ax[i].axhline(y=avg6,
-                              color="blue",
-                              linewidth=0.5,
-                              label='avg past 6 months',
-                              linestyle='--')
-                ax[i].annotate('{}'.format(avg6),
-                               xy=(el.index[0], avg6),
-                               xytext=(-10, 1),  # 3 points vertical offset
-                               textcoords="offset points",
-                               ha='right',
-                               va='bottom',
                                color='blue')
-            if avgOlderThan6Months > 0:  # No need to plot the average if it's 0
-                ax[i].axhline(y=avgOlderThan6Months,
-                              color="green",
-                              linewidth=0.5,
-                              label='avg before 6 months',
-                              linestyle='--')
-                ax[i].annotate('{}'.format(avgOlderThan6Months),
-                               xy=(el.index[0], avgOlderThan6Months),
-                               xytext=(-10, 1),  # 3 points vertical offset
-                               textcoords="offset points",
-                               ha='right',
-                               va='bottom',
-                               color='green')
+
             autolabel(bar, ax[i], el['amount'])
 
             # 45 deg angle for X labels
@@ -399,6 +406,7 @@ def render_monthly_bar_by_cat(_df_list):
 
 #
 # @brief      Will plot a stacked bar chart. Displaying the total amount of spending per month, stacking all categories together
+#             Additionally will display average spending overall and over 6 months periods
 #
 # @param      _df_list  List that contains each categorie's dataframe spending per month
 #
@@ -443,14 +451,14 @@ def render_monthly_bar_stacked(_df_list):
 
         # Plot the average monthly spending on the corresponding graph
         _, _, avg = compute_average(tot_spending)
-        _, _, avg6 = compute_average(tot_spending, period_months=7, absolute=True)  # 7 since we never count the current month
+        _, _, avg6 = compute_average(tot_spending, forMonths=7, absolute=True)  # 7 since we never count the current month
 
         _6MonthsAgo = date.today() - pd.DateOffset(months=6)
-        _, _, avgOlderThan6Months = compute_average(tot_spending, fromDay=_6MonthsAgo)
+        _, _, avgOlderThan6Months = compute_average(tot_spending, endDay=_6MonthsAgo)
 
         if avg > 0:  # No need to plot the average if it's 0
             ax.axhline(y=avg,
-                          color="red",
+                          color="blue",
                           linewidth=0.5,
                           label='all time avg',
                           linestyle='--')
@@ -460,33 +468,43 @@ def render_monthly_bar_stacked(_df_list):
                            textcoords="offset points",
                            ha='right',
                            va='bottom',
-                           color='red')
-        if avg6 > 0:  # No need to plot the average if it's 0
-            ax.axhline(y=avg6,
-                          color="blue",
-                          linewidth=0.5,
-                          label='avg past 6 months',
-                          linestyle='--')
-            ax.annotate('{}'.format(avg6),
-                           xy=(tot_spending.index[0], avg6),
-                           xytext=(-10, 1),  # 3 points vertical offset
-                           textcoords="offset points",
-                           ha='right',
-                           va='bottom',
                            color='blue')
-        if avgOlderThan6Months > 0:  # No need to plot the average if it's 0
-            ax.axhline(y=avgOlderThan6Months,
-                          color="green",
-                          linewidth=0.5,
-                          label='avg before 6 months',
-                          linestyle='--')
-            ax.annotate('{}'.format(avgOlderThan6Months),
-                           xy=(tot_spending.index[0], avgOlderThan6Months),
-                           xytext=(-10, 1),  # 3 points vertical offset
-                           textcoords="offset points",
-                           ha='right',
-                           va='bottom',
-                           color='green')
+
+        compute = True
+        # Start calculating from last month's last day
+        _endPeriod = date.today() - pd.DateOffset(months=1)
+        _endPeriod += MonthEnd(0)
+
+        _6monthsAvgDates = []
+        _6monthsAvgValues = []
+
+        while(compute):
+            _, _, avgOver6mth = compute_average(tot_spending, endDay=_endPeriod, forMonths=6, absolute=True)
+            _6monthsAvgValues.append(avgOver6mth)
+            _6monthsAvgDates.append(_endPeriod)
+
+            _endPeriod -= pd.DateOffset(months=6) # New end period moved back 6months
+            if _endPeriod <= tot_spending.index.min():  # We've reached the end of the dataframe
+                _endPeriod = tot_spending.index.min()
+                compute = False
+
+            _6monthsAvgDates.append(_endPeriod)
+            _6monthsAvgValues.append(avgOver6mth)
+
+        ax.plot(_6monthsAvgDates, _6monthsAvgValues,'-o',
+                color='red',
+                label=f"Avg over 6 months period")
+        for j, val in enumerate(zip(_6monthsAvgDates, _6monthsAvgValues)):
+                # _6monthsAvgDates is ordered from recent to old so the plot "starts" from the right
+                # We don't need to annotate twice the same value. let's skip one.
+                if j%2 > 0:
+                    ax.annotate('{}'.format(val[1]),
+                              xy=val,
+                              xytext=(-5, 1),  # 3 points vertical offset
+                              textcoords="offset points",
+                              ha='right',
+                              va='bottom',
+                              color='red')
 
     autolabel(bar, ax, tot_spending['amount'])
 
