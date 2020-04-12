@@ -19,13 +19,12 @@ register_matplotlib_converters()
 
 csv_folder = os.path.dirname(os.path.abspath(__file__)) + "/statements"
 output_pdf = os.path.dirname(os.path.abspath(__file__)) + "/statements/overview.pdf"
-header = ["date","place","amount"]
 
 Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia foods", "whole foods",
              "organic acres market", "danial market", "choices", "safeway", "market", "urban fare",
              "nofrills"]
 
-Transport = ["car2go", "c2g", "evo car share", "avis", "rentals", "petrocan", "husky", "[^a-z]esso",
+Transport = ["car2go", "c2g", "evo *car *share", "avis", "rentals", "petrocan", "husky", "[^a-z]esso",
              "super save", "cab[^a-rt-z]",  "compass", "taxi", "shell", "poparide", "uber", "lyft", "amtrack", "boltbus"]
 
 Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
@@ -37,7 +36,7 @@ Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
               "freshii", "captain's boil", "korean", "salade de fruits", "a & w", "ebisu", "mcdonald's", "cuchillo",
               "joe fortes", "the templeton", "freshii", "catering", "mary's", "meat & bread", "church's chicken",
               "rosemary rocksalt", "food", "deli", "red robin", "food", "snack", "banter room", "tap house", "lunch",
-              "wings", "dairy queen"]
+              "wings", "dairy queen", "tocador", "keg"]
 
 Coffee = ["cafe", "coffee", "tim hortons", "starbucks", "bean", "birds & the beets", "the mighty oak",
           "le marche st george", "caffe", "coco et olive", "buro", "blenz", "green horn", "bakery", "revolver",
@@ -185,15 +184,11 @@ def extract_monthly_spending(_df, category):
     max_month = date.today().month
 
     for year in range(min_year, max_year + 1):
-        if year == min_year:
-            start_month = min_month
-        else:
-            start_month = 1
+        start_month = 1 if year > min_year else min_month
+        end_month = 12 if year < max_year else max_month
 
-        if year == max_year:
-            end_month = max_month
-        else:
-            end_month = 12
+        start_month = min_month if year == min_year else 1
+        end_month = max_month if year == max_year else 12
 
         # sum all spending from a whole month, each month of the year
         for month in range(start_month, end_month + 1):
@@ -256,20 +251,9 @@ def compute_average(_df, forMonths=0, absolute=False, endDay=pd.datetime.now().d
     _df = _df.drop(_df[_df.amount == 0].index)
 
     # Handles the cases where after dropping all the rows we end up with an empty dataframe
-    if numpy.isnan(_df.min().amount):
-        _min = 0
-    else:
-        _min = int(_df.min().amount)
-
-    if numpy.isnan(_df.max().amount):
-        _max = 0
-    else:
-        _max = int(_df.max().amount)
-
-    if numpy.isnan(_df.mean().amount):
-        _mean = 0
-    else:
-        _mean = int(_df.mean().amount)
+    _min = 0 if numpy.isnan(_df.min().amount) else int(_df.min().amount)
+    _max = 0 if numpy.isnan(_df.max().amount) else int(_df.max().amount)
+    _mean = 0 if numpy.isnan(_df.mean().amount) else int(_df.mean().amount)
 
     return _min, _max, _mean
 
@@ -318,7 +302,6 @@ def render_monthly_bar_by_cat(_df_list):
             # Plot the average monthly spending on the corresponding graph
             # Let's plot past averages over multiple 6 months periods as well as an all time average
 
-            compute = True
             # Start calculating from last month's last day
             _endPeriod = date.today() - pd.DateOffset(months=1)
             _endPeriod += MonthEnd(0)
@@ -326,6 +309,7 @@ def render_monthly_bar_by_cat(_df_list):
             _6monthsAvgDates = []
             _6monthsAvgValues = []
 
+            compute = True
             while(compute):
                 _, _, avgOver6mth = compute_average(el, endDay=_endPeriod, forMonths=6, absolute=True)
                 _6monthsAvgValues.append(avgOver6mth)
@@ -363,10 +347,8 @@ def render_monthly_bar_by_cat(_df_list):
                               label='all time avg',
                               linestyle='--')
                 ax[i].annotate('{}'.format(avg),
-                               xy=(el.index[0], avg),
-                               xytext=(-10, 1),  # 3 points vertical offset
-                               textcoords="offset points",
-                               ha='right',
+                               xy=(el.index[0] - pd.DateOffset(months=1), avg),
+                               ha='left',
                                va='bottom',
                                color='blue')
 
@@ -451,10 +433,6 @@ def render_monthly_bar_stacked(_df_list):
 
         # Plot the average monthly spending on the corresponding graph
         _, _, avg = compute_average(tot_spending)
-        _, _, avg6 = compute_average(tot_spending, forMonths=7, absolute=True)  # 7 since we never count the current month
-
-        _6MonthsAgo = date.today() - pd.DateOffset(months=6)
-        _, _, avgOlderThan6Months = compute_average(tot_spending, endDay=_6MonthsAgo)
 
         if avg > 0:  # No need to plot the average if it's 0
             ax.axhline(y=avg,
@@ -463,14 +441,11 @@ def render_monthly_bar_stacked(_df_list):
                           label='all time avg',
                           linestyle='--')
             ax.annotate('{}'.format(avg),
-                           xy=(tot_spending.index[0], avg),
-                           xytext=(-10, 1),  # 3 points vertical offset
-                           textcoords="offset points",
+                           xy=(tot_spending.index[0] - pd.DateOffset(months=1) + pd.DateOffset(days=2), avg),
                            ha='right',
                            va='bottom',
                            color='blue')
 
-        compute = True
         # Start calculating from last month's last day
         _endPeriod = date.today() - pd.DateOffset(months=1)
         _endPeriod += MonthEnd(0)
@@ -478,6 +453,7 @@ def render_monthly_bar_stacked(_df_list):
         _6monthsAvgDates = []
         _6monthsAvgValues = []
 
+        compute = True
         while(compute):
             _, _, avgOver6mth = compute_average(tot_spending, endDay=_endPeriod, forMonths=6, absolute=True)
             _6monthsAvgValues.append(avgOver6mth)
