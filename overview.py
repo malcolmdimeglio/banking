@@ -73,7 +73,7 @@ colours = ['#5DADE2',  # blue
 #
 def is_row_in_category(my_row, my_list):
     for el in my_list:
-        if re.search(el, my_row['place']):
+        if re.search(el, my_row['place'], re.IGNORECASE):
             return True
     return False
 
@@ -192,12 +192,11 @@ def extract_monthly_spending(_df, category):
 
         # sum all spending from a whole month, each month of the year
         for month in range(start_month, end_month + 1):
-            df_temp = df_temp.append({"date": "{}-{}".format(month, year),
+            df_temp = df_temp.append({"date": pd.to_datetime("{}-{}".format(month, year)),
                                      "amount": _df[category].loc[(_df[category].date.dt.month == month) &
                                                                  (_df[category].date.dt.year == year), 'amount'].sum()},
                                      ignore_index=True)
     df_temp.name = category
-    df_temp['date'] = pd.to_datetime(df_temp['date'])
     df_temp.set_index('date', inplace=True)
 
     return df_temp
@@ -225,11 +224,11 @@ def autolabel(rects, ax, height):
 # @param      _df            The dataframe to extract the spending mean value of
 # @param      forMonths      The period months from today's date to calculate the average of
 # @param      absolute       Boolean. If False the average computation will no consider the min value and max value for calculation.
-# @param      endDay         Datetime type. Calculate average from this day and for {forMonths}
+# @param      endDay         Datetime type. Calculate average until this day and for the past {forMonths}
 #
-# @return     The average spending over the last 'forMonths'. Also return min and max value over the same period of time
+# @return     The average spending over the last 'forMonths'.
 #
-def compute_average(_df, forMonths=0, absolute=False, endDay=pd.datetime.now().date()):
+def compute_average(_df, forMonths=0, endDay=pd.datetime.now().date(), absolute=False):
     # Allows to compute the average over the last forMonths time
     if forMonths > 0:
         fromDay = endDay - pd.DateOffset(months=int(forMonths))
@@ -251,11 +250,9 @@ def compute_average(_df, forMonths=0, absolute=False, endDay=pd.datetime.now().d
     _df = _df.drop(_df[_df.amount == 0].index)
 
     # Handles the cases where after dropping all the rows we end up with an empty dataframe
-    _min = 0 if numpy.isnan(_df.min().amount) else int(_df.min().amount)
-    _max = 0 if numpy.isnan(_df.max().amount) else int(_df.max().amount)
     _mean = 0 if numpy.isnan(_df.mean().amount) else int(_df.mean().amount)
 
-    return _min, _max, _mean
+    return _mean
 
 
 #
@@ -275,8 +272,7 @@ def render_monthly_bar_by_cat(_df_list):
     fig, ax = plt.subplots(int(row), int(col), figsize=(30, 15))
     ax = ax.flatten()
 
-    i = 0
-    for el in _df_list:
+    for i, el in enumerate(_df_list):
         print("Render monthy spending on bar graph for {}".format(el.name))
 
         if el.empty:
@@ -311,7 +307,7 @@ def render_monthly_bar_by_cat(_df_list):
 
             compute = True
             while(compute):
-                _, _, avgOver6mth = compute_average(el, endDay=_endPeriod, forMonths=6, absolute=True)
+                avgOver6mth = compute_average(el, endDay=_endPeriod, forMonths=6, absolute=True)
                 _6monthsAvgValues.append(avgOver6mth)
                 _6monthsAvgDates.append(_endPeriod)
 
@@ -339,7 +335,7 @@ def render_monthly_bar_by_cat(_df_list):
                                    color='red')
 
 
-            _, _, avg = compute_average(el)
+            avg = compute_average(el)
             if avg > 0:  # No need to plot the average if it's 0
                 ax[i].axhline(y=avg,
                               color="blue",
@@ -375,8 +371,6 @@ def render_monthly_bar_by_cat(_df_list):
         # Specify formatter
         ax[i].xaxis.set_major_formatter(fmt)
         ax[i].legend()
-
-        i += 1
 
     # Remove unused plots
     for j in range(i, len(ax)):
@@ -432,7 +426,7 @@ def render_monthly_bar_stacked(_df_list):
             tot_spending = tot_spending.add(_df, fill_value=0)
 
         # Plot the average monthly spending on the corresponding graph
-        _, _, avg = compute_average(tot_spending)
+        avg = compute_average(tot_spending)
 
         if avg > 0:  # No need to plot the average if it's 0
             ax.axhline(y=avg,
@@ -455,7 +449,7 @@ def render_monthly_bar_stacked(_df_list):
 
         compute = True
         while(compute):
-            _, _, avgOver6mth = compute_average(tot_spending, endDay=_endPeriod, forMonths=6, absolute=True)
+            avgOver6mth = compute_average(tot_spending, endDay=_endPeriod, forMonths=6, absolute=True)
             _6monthsAvgValues.append(avgOver6mth)
             _6monthsAvgDates.append(_endPeriod)
 
@@ -470,6 +464,7 @@ def render_monthly_bar_stacked(_df_list):
         ax.plot(_6monthsAvgDates, _6monthsAvgValues,'-o',
                 color='red',
                 label=f"Avg over 6 months period")
+
         for j, val in enumerate(zip(_6monthsAvgDates, _6monthsAvgValues)):
                 # _6monthsAvgDates is ordered from recent to old so the plot "starts" from the right
                 # We don't need to annotate twice the same value. let's skip one.
@@ -524,7 +519,7 @@ def render_average_pie(_df_list):
 
     for el in _df_list:
         if not el.empty:  # Do not handle categories with no data
-            _, _, average = compute_average(el, absolute=True)
+            average = compute_average(el, absolute=True)
             avg_df = avg_df.append({'name': el.name, 'amount': average}, ignore_index=True)
 
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
@@ -573,11 +568,9 @@ if __name__ == "__main__":
     if all_spending_df.empty:
         print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
         \nPlease check the content of {}".format(os.path.basename(csv_file)))
-        sys.exit()
 
     # Change spending into positive values, lower case the 'place' column and datetime format for the 'date' column
-    all_spending_df['amount'] = all_spending_df['amount'].apply(lambda x: -x)  # Maybe more efficient not to and just do that at the very end when ploting the graph?
-    all_spending_df['place'] = all_spending_df["place"].apply(lambda x: x.lower())
+    all_spending_df['amount'] = all_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
     all_spending_df['date'] = pd.to_datetime(all_spending_df['date'])
 
     data = organise_data_by_category(all_spending_df)
