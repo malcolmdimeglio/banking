@@ -111,3 +111,4 @@ venv.bak/
 
 # inherent to project
 statements/
+*.pdf
