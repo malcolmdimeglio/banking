@@ -36,7 +36,7 @@ Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
               "freshii", "captain's boil", "korean", "salade de fruits", "a & w", "ebisu", "mcdonald's", "cuchillo",
               "joe fortes", "the templeton", "freshii", "catering", "mary's", "meat & bread", "church's chicken",
               "rosemary rocksalt", "food", "deli", "red robin", "food", "snack", "banter room", "tap house", "lunch",
-              "wings", "dairy queen", "tocador", "keg"]
+              "wings", "dairy queen", "tocador", "keg", "panago"]
 
 Coffee = ["cafe", "coffee", "tim hortons", "starbucks", "bean", "birds & the beets", "the mighty oak",
           "le marche st george", "caffe", "coco et olive", "buro", "blenz", "green horn", "bakery", "revolver",
@@ -46,7 +46,7 @@ Coffee = ["cafe", "coffee", "tim hortons", "starbucks", "bean", "birds & the bee
 Bar = ["brew", "beer", "pub[^a-z]", "steamworks", "distillery", "bar[^a-z]", "narrow lounge", "rumpus room",
        "five point", "score on davie", "tap & barrel", "the cambie", "colony", "alibi room", "local ",
        "per se social corner", "grapes & soda", "portland craft", "the new oxford", "keefer", "liquor", "wine", "tapshack",
-       "fox", "night club", "disco cheetah", "the pint", "the roxy", "commodore", "high tower management"]
+       "fox", "night club", "disco cheetah", "the pint", "the roxy", "commodore", "high tower management", "browns", "lounge", "mahony"]
 
 GROCERIES = 'groceries'
 TRANSPORT = 'transport'
