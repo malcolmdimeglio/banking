@@ -18,7 +18,7 @@ register_matplotlib_converters()
 
 
 csv_folder = os.path.dirname(os.path.abspath(__file__)) + "/statements"
-output_pdf = os.path.dirname(os.path.abspath(__file__)) + "/statements/overview.pdf"
+output_pdf = os.path.dirname(os.path.abspath(__file__)) + "/overview.pdf"
 
 Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia foods", "whole foods",
              "organic acres market", "danial market", "choices", "safeway", "market", "urban fare",
