@@ -545,6 +545,26 @@ def render_average_pie(_df_list):
 
 
 if __name__ == "__main__":
+    # Let's handle the potential debug parameters first
+    if len(sys.argv) >= 2 and sys.argv[1].lower() == "debug":
+        print("\n--- DEBUG ---")
+        debug_pd = [];
+        if len(sys.argv) >= 3:
+            for arg in sys.argv[2:]:
+                l_arg = arg.lower()
+                if l_arg == GROCERIES or l_arg == TRANSPORT or l_arg == RESTAURANT or l_arg == COFFEE or l_arg == BAR or l_arg == MISC:
+                    debug_pd.append(l_arg)
+                elif l_arg == "all":  # if all then redefine everything and exit the loop. So that we don't have doubles
+                    debug_pd = [GROCERIES, TRANSPORT, RESTAURANT, COFFEE, BAR, MISC]
+                    break;
+                else:
+                    print(f" '{arg}' Unknown parameter. Parameter accepted are: groceries, transport, restaurant, coffee, bar, misc, all")
+                    print("i.e: ./overview debug bar")
+                    exit()
+        else:
+            debug_pd.append("misc")
+
+    # Verify hard codded output pdf path
     if not (os.path.exists(os.path.dirname(output_pdf))):
         print(f"Could not access {os.path.dirname(output_pdf)} to output the results. Please verify path syntax")
         sys.exit()
@@ -560,6 +580,8 @@ if __name__ == "__main__":
         print('** ERROR ** File {} not found'.format(csv_file))
         sys.exit()
 
+
+    # Start computing
     all_spending_df = pd.concat(tmp_list, axis=0, ignore_index=True, sort=False)
 
     print("Remove incomes, standardize text and date")
@@ -595,12 +617,17 @@ if __name__ == "__main__":
     doc.close()
     print("Output PDF document: {}".format(output_pdf))
 
-    if len(sys.argv) > 1 and sys.argv[1].lower() == "debug":
-        print("\n--- DEBUG ---")
-        print("Content of full dataframe organized by categories \n")
-        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-            # TODO: just print sorted by date, uniq, misc
-            for key,val in data.items():
-                print(f"{key.upper()}\n{val.sort_values(by=['date']).to_string(index=False)}")
+    if len(debug_pd) > 0:
+        for el in debug_pd:
+            print(f"Content of {el} dataframe")
+            with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+                print(data[el].sort_values(by=['date']).to_string(index=False))
                 print()
+
+
+
+
+
+
+
 
