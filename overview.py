@@ -373,7 +373,7 @@ def render_monthly_bar_by_cat(_df_list):
         ax[i].legend()
 
     # Remove unused plots
-    for j in range(i, len(ax)):
+    for j in range(i+1, len(ax)):
         ax[j].set_axis_off()
 
     plt.tight_layout(w_pad=2.3, h_pad=1.3)
