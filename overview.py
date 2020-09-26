@@ -317,8 +317,10 @@ def compute_average(_df, forMonths=0, endDay=pd.datetime.now().date(), absolute=
     if not absolute:
         _df = _df.drop(_df[_df.amount == _df.amount.max()].index)
         _df = _df.drop(_df[_df.amount == _df.amount.min()].index)
+        _df = _df.drop(_df[_df.amount == 0].index)
+
+    # get rid of any data of the current month as it is not complete.
     _df = _df.drop(_df[(_df.index.month == date.today().month) & (_df.index.year == date.today().year)].index)
-    _df = _df.drop(_df[_df.amount == 0].index)
 
     # Handles the cases where after dropping all the rows we end up with an empty dataframe
     _mean = 0 if numpy.isnan(_df.mean().amount) else int(_df.mean().amount)
