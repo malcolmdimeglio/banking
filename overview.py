@@ -623,7 +623,7 @@ if __name__ == "__main__":
     # Let's handle the potential debug parameters first
     if len(sys.argv) >= 2 and sys.argv[1].lower() == "debug":
         print("\n--- DEBUG ---")
-        debug_pd = [];
+        debug_pd = []
         if len(sys.argv) >= 3:
             for arg in sys.argv[2:]:
                 l_arg = arg.lower()
@@ -703,7 +703,7 @@ if __name__ == "__main__":
     doc.close()
     print("Output PDF document: {}".format(output_pdf))
 
-    if len(debug_pd) > 0:
+    if "debug_pd" in locals() and len(debug_pd) > 0:
         for el in debug_pd:
             print(f"Content of {el} dataframe")
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
