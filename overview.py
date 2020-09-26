@@ -235,7 +235,7 @@ def organise_transport_by_sub_cat(_dfTransport):
 #
 # @return     A dataframe with only 1 category's information and the sum of all the spendings for that category, listed by month
 #
-def extract_monthly_spending(_df, category):
+def extract_monthly_spending_by_category(_df, category):
     print("Extract monthly spendings for {}".format(category))
     df_temp = pd.DataFrame(columns=['date', 'amount'])
 
@@ -329,11 +329,12 @@ def compute_average(_df, forMonths=0, endDay=pd.datetime.now().date(), absolute=
 
 # @brief      Will plot a bar chart for each category. X axis will be scaled by month.
 #
-# @param      _df_list  List that contains each categorie's dataframe spending per month
+# @param      _df_list          List that contains each categorie's dataframe spending per month
+# @param      useAbsoluteAvg    Boolean. If False the average computation will no consider the min value and max value for calculation.
 #
 # @return     The figure with all the charts
 #
-def render_monthly_bar_by_cat(_df_list):
+def render_monthly_bar_by_cat(_df_list, useAbsoluteAvg=False):
     # 3 columns display
     col = 3
     row = len(_df_list) / 3
@@ -406,7 +407,7 @@ def render_monthly_bar_by_cat(_df_list):
                                    color='red')
 
 
-            avg = compute_average(el)
+            avg = compute_average(el, absolute=useAbsoluteAvg)
             if avg > 0:  # No need to plot the average if it's 0
                 ax[i].axhline(y=avg,
                               color="blue",
@@ -455,11 +456,12 @@ def render_monthly_bar_by_cat(_df_list):
 # @brief      Will plot a stacked bar chart. Displaying the total amount of spending per month, stacking all categories together
 #             Additionally will display average spending overall and over 6 months periods
 #
-# @param      _df_list  List that contains each categorie's dataframe spending per month
+# @param      _df_list          List that contains each categorie's dataframe spending per month
+# @param      useAbsoluteAvg    Boolean. If False the average computation will no consider the min value and max value for calculation.
 #
 # @return     The figure with the calculated chart
 #
-def render_monthly_bar_stacked(_df_list):
+def render_monthly_bar_stacked(_df_list, useAbsoluteAvg=False, title="Month by month spending"):
     print("Render monthy spending on stack graph for all categories")
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
 
@@ -497,7 +499,7 @@ def render_monthly_bar_stacked(_df_list):
             tot_spending = tot_spending.add(_df, fill_value=0)
 
         # Plot the average monthly spending on the corresponding graph
-        avg = compute_average(tot_spending)
+        avg = compute_average(tot_spending, absolute=useAbsoluteAvg)
 
         if avg > 0:  # No need to plot the average if it's 0
             ax.axhline(y=avg,
@@ -558,7 +560,7 @@ def render_monthly_bar_stacked(_df_list):
     # Add XY labels and title
     ax.title.set_weight('extra bold')
     ax.title.set_fontsize('xx-large')
-    ax.title.set_text("Month by month spending")
+    ax.title.set_text(title)
     ax.set_ylabel('Spending ($)', fontsize='xx-large')
     ax.set_xlabel('Date', fontsize='xx-large')
 
