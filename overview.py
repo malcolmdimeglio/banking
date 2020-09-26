@@ -103,7 +103,7 @@ def populate(_df, row):
     return _df
 
 
-#
+
 # @brief      Parse all spending and populate smaller dataframes by categories
 #
 # @param      my_dataframe  Unparsed dataframe with all uncategorized expenses
@@ -114,8 +114,7 @@ def organise_data_by_category(my_dataframe):
     print("Organise spendings into categories")
 
     # it is 3 times faster to create a dataframe from a full dictionary rather than appending rows after rows to an already existing dataframe
-    dic_groc, dic_trans, dic_rest, dic_coffee, \
-        dic_bar, dic_misc = {}, {}, {}, {}, {}, {}
+    dic_groc, dic_trans, dic_rest, dic_coffee, dic_bar, dic_misc = {}, {}, {}, {}, {}, {}
     g, t, r, c, b, m = [0]*6  # indexes
 
     # Let's go over each rows of the unsorted dataframe and populate the category's dictionary.
@@ -272,7 +271,8 @@ def extract_monthly_spending(_df, category):
 
     return df_temp
 
-#
+
+
 # @brief      Attach a text label above each ploted bar.
 #
 # @param      rects   The rectangles (each ploted bar)
@@ -289,7 +289,7 @@ def autolabel(rects, ax, height):
                     va='bottom')
 
 
-#
+
 # @brief      Calculates the average.
 #
 # @param      _df            The dataframe to extract the spending mean value of
@@ -326,7 +326,7 @@ def compute_average(_df, forMonths=0, endDay=pd.datetime.now().date(), absolute=
     return _mean
 
 
-#
+
 # @brief      Will plot a bar chart for each category. X axis will be scaled by month.
 #
 # @param      _df_list  List that contains each categorie's dataframe spending per month
@@ -451,7 +451,7 @@ def render_monthly_bar_by_cat(_df_list):
     return fig
 
 
-#
+
 # @brief      Will plot a stacked bar chart. Displaying the total amount of spending per month, stacking all categories together
 #             Additionally will display average spending overall and over 6 months periods
 #
@@ -630,7 +630,7 @@ if __name__ == "__main__":
                     break;
                 else:
                     print(f" '{arg}' Unknown parameter. Parameter accepted are: groceries, transport, restaurant, coffee, bar, misc, all")
-                    print("i.e: ./overview debug bar")
+                    print("i.e: ./overview debug bar coffee")
                     exit()
         else:
             debug_pd.append("misc")
