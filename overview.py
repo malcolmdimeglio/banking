@@ -24,8 +24,13 @@ Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia fo
              "organic acres market", "danial market", "choices", "safeway", "market", "urban fare",
              "nofrills"]
 
-Transport = ["car2go", "c2g", "evo *car *share", "avis", "rentals", "petrocan", "husky", "[^a-z]esso",
-             "super save", "cab[^a-rt-z]",  "compass", "taxi", "shell", "poparide", "uber", "lyft", "amtrack", "boltbus"]
+TransportCarShare = ["car2go", "c2g", "evo *car *share"]
+TransportRental = ["avis", "rentals", "petrocan", "husky", "[^a-z]esso", "super save", "shell"]
+TransportCab = ["cab[^a-rt-z]", "taxi", "uber", "lyft"]
+TransportTranslink = ["compass"]
+TransportMisc = ["poparide", "amtrack", "boltbus"]
+Transport = TransportCarShare + TransportRental + TransportCab + TransportTranslink + TransportMisc
+
 
 Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
               "moxie's", "burger", "la belle patate", "pho", "pizza", "bestie",
@@ -54,6 +59,11 @@ RESTAURANT = 'restaurant'
 COFFEE = 'coffee'
 BAR = 'bar'
 MISC = 'misc'
+TR_CARSHARE = 'tr_carshare'
+TR_RENTAL = 'tr_rental'
+TR_CAB = 'tr_cab'
+TR_TRANSLINK = 'tr_translink'
+TR_MISC = 'tr_misc'
 
 colours = ['#5DADE2',  # blue
            '#F5B041',  # orange
@@ -156,6 +166,67 @@ def organise_data_by_category(my_dataframe):
     }
 
     return all_df
+
+
+# @brief      Parse all spending in transport and populate smaller dataframes by categories
+#
+# @param      _dfTransport  Unparsed dataframe with all transport expenses
+#
+# @return     A dictionary of dataframe. [key] = category name; [value] = dataframe with the all categorie's related expenses
+#
+
+
+def organise_transport_by_sub_cat(_dfTransport):
+    # it is 3 times faster to create a dataframe from a full dictionary rather than appending rows after rows to an already existing dataframe
+    dic_carshare, dic_rental, dic_cab, dic_translink, dic_misc = {}, {}, {}, {}, {}
+    csh, r, c, t, m = [0]*5  # indexes
+
+    # Let's go over each rows of the unsorted dataframe and populate the category's dictionary.
+    for index, row in _dfTransport.iterrows():
+        if is_row_in_category(row, TransportCarShare):
+            dic_carshare[csh] = row
+            csh = csh + 1
+            continue
+
+        if is_row_in_category(row, TransportRental):
+            dic_rental[r] = row
+            r = r+1
+            continue
+
+        if is_row_in_category(row, TransportCab):
+            dic_cab[c] = row
+            c = c+1
+            continue
+
+        if is_row_in_category(row, TransportTranslink):
+            dic_translink[t] = row
+            t = t+1
+            continue
+
+        if is_row_in_category(row, TransportMisc):
+            dic_misc[m] = row
+            m = m+1
+            continue
+
+        # If none of the above then let's put it in misc spending
+        dic_misc[m] = row
+        m = m+1
+
+    df_carshare = pd.DataFrame.from_dict(dic_carshare, orient='index', columns=['date', 'place', 'amount'])
+    df_rental = pd.DataFrame.from_dict(dic_rental, orient='index', columns=['date', 'place', 'amount'])
+    df_cab = pd.DataFrame.from_dict(dic_cab, orient='index', columns=['date', 'place', 'amount'])
+    df_translink = pd.DataFrame.from_dict(dic_translink, orient='index', columns=['date', 'place', 'amount'])
+    df_misc = pd.DataFrame.from_dict(dic_misc, orient='index', columns=['date', 'place', 'amount'])
+
+    allTransport_df = {
+        TR_CARSHARE: df_carshare,
+        TR_RENTAL: df_rental,
+        TR_CAB: df_cab,
+        TR_TRANSLINK: df_translink,
+        TR_MISC: df_misc
+    }
+
+    return allTransport_df
 
 
 # @brief      Sumarize for each month the total spending for a given category
@@ -591,25 +662,36 @@ if __name__ == "__main__":
         print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
         \nPlease check the content of {}".format(os.path.basename(csv_file)))
 
-    # Change spending into positive values, lower case the 'place' column and datetime format for the 'date' column
+    # Change spending into positive values, datetime format for the 'date' column
     all_spending_df['amount'] = all_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
     all_spending_df['date'] = pd.to_datetime(all_spending_df['date'])
 
     data = organise_data_by_category(all_spending_df)
-    monthly_groceries = extract_monthly_spending(data, GROCERIES)
-    monthly_transport = extract_monthly_spending(data, TRANSPORT)
-    monthly_restaurant = extract_monthly_spending(data, RESTAURANT)
-    monthly_coffee = extract_monthly_spending(data, COFFEE)
-    monthly_bar = extract_monthly_spending(data, BAR)
-    monthly_misc = extract_monthly_spending(data, MISC)
+    monthly_groceries = extract_monthly_spending_by_category(data, GROCERIES)
+    monthly_transport = extract_monthly_spending_by_category(data, TRANSPORT)
+    monthly_restaurant = extract_monthly_spending_by_category(data, RESTAURANT)
+    monthly_coffee = extract_monthly_spending_by_category(data, COFFEE)
+    monthly_bar = extract_monthly_spending_by_category(data, BAR)
+    monthly_misc = extract_monthly_spending_by_category(data, MISC)
+
+    transport_data = organise_transport_by_sub_cat(data[TRANSPORT]);
+    monthly_transport_carshare = extract_monthly_spending_by_category(transport_data, TR_CARSHARE)
+    monthly_transport_rental = extract_monthly_spending_by_category(transport_data, TR_RENTAL)
+    monthly_transport_cab = extract_monthly_spending_by_category(transport_data, TR_CAB)
+    monthly_transport_translink = extract_monthly_spending_by_category(transport_data, TR_TRANSLINK)
+    monthly_transport_misc = extract_monthly_spending_by_category(transport_data, TR_MISC)
 
     monthly_spending = [monthly_groceries, monthly_transport, monthly_restaurant,
                         monthly_coffee, monthly_bar, monthly_misc]
+
+    monthly_transport = [monthly_transport_carshare, monthly_transport_rental, monthly_transport_cab, monthly_transport_translink]  # not interested about misc
 
     figures = []
     figures.append(render_monthly_bar_by_cat(monthly_spending))
     figures.append(render_monthly_bar_stacked(monthly_spending))
     figures.append(render_average_pie(monthly_spending))
+    figures.append(render_monthly_bar_by_cat(monthly_transport, useAbsoluteAvg=True))
+    #figures.append(render_monthly_bar_stacked(monthly_transport, useAbsoluteAvg=True, title="Month by month transport"))
 
     doc = PdfPages(output_pdf)
     for figure in figures:
