@@ -53,12 +53,15 @@ Bar = ["brew", "beer", "pub[^a-z]", "steamworks", "distillery", "bar[^a-z]", "na
        "per se social corner", "grapes & soda", "portland craft", "the new oxford", "keefer", "liquor", "wine", "tapshack",
        "fox", "night club", "disco cheetah", "the pint", "the roxy", "commodore", "high tower management", "browns", "lounge", "mahony"]
 
+Bills = ["fido", "shaw", "fitness", "ymca", "bcaa", "digital ocean", "twilio", "soundcloud"]
+
 GROCERIES = 'groceries'
 TRANSPORT = 'transport'
 RESTAURANT = 'restaurant'
 COFFEE = 'coffee'
 BAR = 'bar'
 MISC = 'misc'
+BILLS = 'bills'
 TR_CARSHARE = 'tr_carshare'
 TR_RENTAL = 'tr_rental'
 TR_CAB = 'tr_cab'
@@ -114,8 +117,8 @@ def organise_data_by_category(my_dataframe):
     print("Organise spendings into categories")
 
     # it is 3 times faster to create a dataframe from a full dictionary rather than appending rows after rows to an already existing dataframe
-    dic_groc, dic_trans, dic_rest, dic_coffee, dic_bar, dic_misc = {}, {}, {}, {}, {}, {}
-    g, t, r, c, b, m = [0]*6  # indexes
+    dic_groc, dic_trans, dic_rest, dic_coffee, dic_bar, dic_misc, dic_bills = {}, {}, {}, {}, {}, {}, {}
+    g, t, r, c, b, m, f = [0]*7  # indexes
 
     # Let's go over each rows of the unsorted dataframe and populate the category's dictionary.
     for index, row in my_dataframe.iterrows():
@@ -144,6 +147,11 @@ def organise_data_by_category(my_dataframe):
             b = b+1
             continue
 
+        if is_row_in_category(row, Bills):
+            dic_bills[f] = row
+            f = f+1
+            continue
+
         # If none of the above then let's put it in misc spending
         dic_misc[m] = row
         m = m+1
@@ -154,6 +162,7 @@ def organise_data_by_category(my_dataframe):
     df_coffee = pd.DataFrame.from_dict(dic_coffee, orient='index', columns=['date', 'place', 'amount'])
     df_bar = pd.DataFrame.from_dict(dic_bar, orient='index', columns=['date', 'place', 'amount'])
     df_misc = pd.DataFrame.from_dict(dic_misc, orient='index', columns=['date', 'place', 'amount'])
+    df_bills = pd.DataFrame.from_dict(dic_bills, orient='index', columns=['date', 'place', 'amount'])
 
     all_df = {
         GROCERIES: df_groc,
@@ -161,7 +170,8 @@ def organise_data_by_category(my_dataframe):
         RESTAURANT: df_rest,
         COFFEE: df_coffee,
         BAR: df_bar,
-        MISC: df_misc
+        MISC: df_misc,
+        BILLS: df_bills
     }
 
     return all_df
@@ -243,6 +253,10 @@ def extract_monthly_spending_by_category(_df, category):
         df_temp.name = category
         return df_temp
 
+    if category == BILLS:
+        df_rent = pd.DataFrame(columns=['date', 'amount'])
+
+
     # let's only do the math between the first and last spending day in the csv file to avoid
     # blank values at the begining and the end of the charts
     #
@@ -266,8 +280,28 @@ def extract_monthly_spending_by_category(_df, category):
                                      "amount": _df[category].loc[(_df[category].date.dt.month == month) &
                                                                  (_df[category].date.dt.year == year), 'amount'].sum()},
                                      ignore_index=True)
+
+            if category == BILLS:  # handle rent
+                if year == 2018 and month < 12:
+                    df_rent = df_rent.append({"date": pd.to_datetime("{}-{}".format(month, year)),
+                                                        "amount": 1000},
+                                                        ignore_index=True)
+                if (year == 2018 and month == 12) or year == 2019 or (year == 2020 and month <= 9):
+                    df_rent = df_rent.append({"date": pd.to_datetime("{}-{}".format(month, year)),
+                                                        "amount": 1550},
+                                                        ignore_index=True)
+                if (year == 2020 and month >= 10) or year > 2020:
+                    df_rent = df_rent.append({"date": pd.to_datetime("{}-{}".format(month, year)),
+                                                        "amount": 1750},
+                                                        ignore_index=True)
+
+
     df_temp.name = category
     df_temp.set_index('date', inplace=True)
+
+    if category == BILLS:  # Add rent to bills
+        df_rent.set_index('date', inplace=True)
+        df_temp["amount"] = df_temp["amount"].add(df_rent["amount"])
 
     return df_temp
 
@@ -599,7 +633,7 @@ def render_average_pie(_df_list):
 
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
     explodes = [0.0] * len(avg_df)
-    explodes[0] = 0.2  # select the 0 index to explode the piece of the pie. The value has been determined by visual tests
+    explodes[1] = 0.2  # select the 1 index to explode the piece of the pie. The value has been determined by visual tests
     _, _, autotexts = ax.pie(avg_df['amount'], labels=avg_df['name'],
                              explode=explodes,
                              autopct='%1.1f%%',
@@ -677,6 +711,7 @@ if __name__ == "__main__":
     monthly_coffee = extract_monthly_spending_by_category(data, COFFEE)
     monthly_bar = extract_monthly_spending_by_category(data, BAR)
     monthly_misc = extract_monthly_spending_by_category(data, MISC)
+    monthly_bills = extract_monthly_spending_by_category(data, BILLS)
 
     transport_data = organise_transport_by_sub_cat(data[TRANSPORT]);
     monthly_transport_carshare = extract_monthly_spending_by_category(transport_data, TR_CARSHARE)
@@ -685,13 +720,13 @@ if __name__ == "__main__":
     monthly_transport_translink = extract_monthly_spending_by_category(transport_data, TR_TRANSLINK)
     monthly_transport_misc = extract_monthly_spending_by_category(transport_data, TR_MISC)
 
-    monthly_spending = [monthly_groceries, monthly_transport, monthly_restaurant,
+    monthly_spending = [monthly_bills, monthly_groceries, monthly_transport, monthly_restaurant,
                         monthly_coffee, monthly_bar, monthly_misc]
 
     monthly_transport = [monthly_transport_carshare, monthly_transport_rental, monthly_transport_cab, monthly_transport_translink]  # not interested about misc
 
     figures = []
-    figures.append(render_monthly_bar_by_cat(monthly_spending))
+    figures.append(render_monthly_bar_by_cat(monthly_spending[1:]))  # Do not plot bills expenses
     figures.append(render_monthly_bar_stacked(monthly_spending))
     figures.append(render_average_pie(monthly_spending))
     figures.append(render_monthly_bar_by_cat(monthly_transport, useAbsoluteAvg=True))
