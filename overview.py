@@ -17,12 +17,13 @@ from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
 
-csv_folder = os.path.dirname(os.path.abspath(__file__)) + "/statements"
+credit_card_statement_folder = os.path.dirname(os.path.abspath(__file__)) + "/statements/CreditCard"
+checking_account_statement_folder = os.path.dirname(os.path.abspath(__file__)) + "/statements/Checking"
 output_pdf = os.path.dirname(os.path.abspath(__file__)) + "/overview.pdf"
 
 Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia foods", "whole foods",
              "organic acres market", "danial market", "choices", "safeway", "market", "urban fare",
-             "nofrills"]
+             "nofrills", "costco"]
 
 TransportCarShare = ["car2go", "c2g", "evo *car *share"]
 TransportRental = ["avis", "rentals", "petrocan", "husky", "[^a-z]esso", "super save", "shell"]
@@ -30,7 +31,6 @@ TransportCab = ["cab[^a-rt-z]", "taxi", "uber", "lyft"]
 TransportTranslink = ["compass"]
 TransportMisc = ["poparide", "amtrack", "boltbus"]
 Transport = TransportCarShare + TransportRental + TransportCab + TransportTranslink + TransportMisc
-
 
 Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
               "moxie's", "burger", "la belle patate", "pho", "pizza", "bestie",
@@ -55,6 +55,8 @@ Bar = ["brew", "beer", "pub[^a-z]", "steamworks", "distillery", "bar[^a-z]", "na
 
 Bills = ["fido", "shaw", "fitness", "ymca", "bcaa", "digital ocean", "twilio", "soundcloud"]
 
+Incomes = ["payroll", "ei", "deposit"]  # deposit include e-transfer
+
 GROCERIES = 'groceries'
 TRANSPORT = 'transport'
 RESTAURANT = 'restaurant'
@@ -62,10 +64,10 @@ COFFEE = 'coffee'
 BAR = 'bar'
 MISC = 'misc'
 BILLS = 'bills'
-TR_CARSHARE = 'tr_carshare'
-TR_RENTAL = 'tr_rental'
-TR_CAB = 'tr_cab'
-TR_TRANSLINK = 'tr_translink'
+TR_CARSHARE = 'carshare'
+TR_RENTAL = 'rental'
+TR_CAB = 'cab'
+TR_TRANSLINK = 'translink'
 TR_MISC = 'tr_misc'
 
 colours = ['#5DADE2',  # blue
@@ -183,8 +185,6 @@ def organise_data_by_category(my_dataframe):
 #
 # @return     A dictionary of dataframe. [key] = category name; [value] = dataframe with the all categorie's related expenses
 #
-
-
 def organise_transport_by_sub_cat(_dfTransport):
     # it is 3 times faster to create a dataframe from a full dictionary rather than appending rows after rows to an already existing dataframe
     dic_carshare, dic_rental, dic_cab, dic_translink, dic_misc = {}, {}, {}, {}, {}
@@ -260,11 +260,11 @@ def extract_monthly_spending_by_category(_df, category):
     # let's only do the math between the first and last spending day in the csv file to avoid
     # blank values at the begining and the end of the charts
     #
-    # max_year = all_spending_df['date'].max().year
+    # max_year = credit_card_spending_df['date'].max().year
     max_year = date.today().year
-    min_year = all_spending_df['date'].min().year
-    min_month = all_spending_df['date'].min().month
-    # max_month = all_spending_df['date'].max().month
+    min_year = credit_card_spending_df['date'].min().year
+    min_month = credit_card_spending_df['date'].min().month
+    # max_month = credit_card_spending_df['date'].max().month
     max_month = date.today().month
 
     for year in range(min_year, max_year + 1):
@@ -281,7 +281,8 @@ def extract_monthly_spending_by_category(_df, category):
                                                                  (_df[category].date.dt.year == year), 'amount'].sum()},
                                      ignore_index=True)
 
-            if category == BILLS:  # handle rent
+            if category == BILLS:
+                # Handle rent
                 if year == 2018 and month < 12:
                     df_rent = df_rent.append({"date": pd.to_datetime("{}-{}".format(month, year)),
                                                         "amount": 1000},
@@ -293,6 +294,11 @@ def extract_monthly_spending_by_category(_df, category):
                 if (year == 2020 and month >= 10) or year > 2020:
                     df_rent = df_rent.append({"date": pd.to_datetime("{}-{}".format(month, year)),
                                                         "amount": 1750},
+                                                        ignore_index=True)
+                # Handle ICBC
+                if (year == 2020 and month >= 11) or year > 2020:
+                    df_rent = df_rent.append({"date": pd.to_datetime("{}-{}".format(month, year)),
+                                                        "amount": 96},
                                                         ignore_index=True)
 
 
@@ -494,6 +500,7 @@ def render_monthly_bar_by_cat(_df_list, useAbsoluteAvg=False):
 #
 # @param      _df_list          List that contains each categorie's dataframe spending per month
 # @param      useAbsoluteAvg    Boolean. If False the average computation will no consider the min value and max value for calculation.
+# @param      title             String. Optional. Give your graph a tittle
 #
 # @return     The figure with the calculated chart
 #
@@ -661,10 +668,10 @@ if __name__ == "__main__":
         if len(sys.argv) >= 3:
             for arg in sys.argv[2:]:
                 l_arg = arg.lower()
-                if l_arg == GROCERIES or l_arg == TRANSPORT or l_arg == RESTAURANT or l_arg == COFFEE or l_arg == BAR or l_arg == MISC:
+                if l_arg == GROCERIES or l_arg == TRANSPORT or l_arg == RESTAURANT or l_arg == COFFEE or l_arg == BAR or l_arg == MISC or l_arg == BILLS:
                     debug_pd.append(l_arg)
                 elif l_arg == "all":  # if all then redefine everything and exit the loop. So that we don't have doubles
-                    debug_pd = [GROCERIES, TRANSPORT, RESTAURANT, COFFEE, BAR, MISC]
+                    debug_pd = [GROCERIES, TRANSPORT, RESTAURANT, COFFEE, BAR, MISC, BILLS]
                     break;
                 else:
                     print(f" '{arg}' Unknown parameter. Parameter accepted are: groceries, transport, restaurant, coffee, bar, misc, all")
@@ -678,42 +685,67 @@ if __name__ == "__main__":
         print(f"Could not access {os.path.dirname(output_pdf)} to output the results. Please verify path syntax")
         sys.exit()
     try:
-        tmp_list = []
-        for file in os.listdir(csv_folder):
+        tmp_list_credit_card = []
+        for file in os.listdir(credit_card_statement_folder):
             if file.lower().endswith('.csv'):
-                csv_file = csv_folder + '/' + file
+                csv_credit_card_file = credit_card_statement_folder + '/' + file
                 print(f"Read CSV file {file}...")
                 # Extract csv into dataframe
-                tmp_list.append(pd.read_csv(filepath_or_buffer=csv_file, sep=',', names=["date","place","amount"]))
+                tmp_list_credit_card.append(pd.read_csv(filepath_or_buffer=csv_credit_card_file, sep=',', names=["date","place","amount"], keep_default_na=False))
     except FileNotFoundError:
-        print('** ERROR ** File {} not found'.format(csv_file))
+        print('** ERROR ** File {} not found'.format(csv_credit_card_file))
+        sys.exit()
+
+    try:
+        tmp_list_checking_account = []
+        for file in os.listdir(checking_account_statement_folder):
+            if file.lower().endswith('.csv'):
+                csv_checking_account_file = checking_account_statement_folder + '/' + file
+                print(f"Read CSV file {file}...")
+                # Extract csv into dataframe
+                tmp_list_checking_account.append(pd.read_csv(filepath_or_buffer=csv_checking_account_file, sep=',', names=["date","amount","null","type","place"], keep_default_na=False))
+    except FileNotFoundError:
+        print('** ERROR ** File {} not found'.format(csv_checking_account_file))
         sys.exit()
 
 
     # Start computing
-    all_spending_df = pd.concat(tmp_list, axis=0, ignore_index=True, sort=False)
+    credit_card_spending_df = pd.concat(tmp_list_credit_card, axis=0, ignore_index=True, sort=False)
+    checking_acount_spending_df = pd.concat(tmp_list_checking_account, axis=0, ignore_index=True, sort=False)
+
 
     print("Remove incomes, standardize text and date")
     # Remove all incomes
-    all_spending_df = all_spending_df[all_spending_df.amount < 0]
-    if all_spending_df.empty:
+    credit_card_spending_df = credit_card_spending_df[credit_card_spending_df.amount < 0]
+    if credit_card_spending_df.empty:
         print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
-        \nPlease check the content of {}".format(os.path.basename(csv_file)))
+        \nPlease check the content of {}".format(os.path.basename(csv_credit_card_file)))
+
+    checking_acount_spending_df = checking_acount_spending_df[checking_acount_spending_df.amount < 0]
+    if checking_acount_spending_df.empty:
+        print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
+        \nPlease check the content of {}".format(os.path.basename(csv_checking_account_file)))
 
     # Change spending into positive values, datetime format for the 'date' column
-    all_spending_df['amount'] = all_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
-    all_spending_df['date'] = pd.to_datetime(all_spending_df['date'])
+    credit_card_spending_df['amount'] = credit_card_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
+    credit_card_spending_df['date'] = pd.to_datetime(credit_card_spending_df['date'])
+    checking_acount_spending_df['amount'] = checking_acount_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
+    checking_acount_spending_df['date'] = pd.to_datetime(checking_acount_spending_df['date'])
+    checking_acount_spending_df = checking_acount_spending_df.drop(columns=["null","type"])  # TODO: probably cleaner to do that from the get go in pd.read_csv()
+    all_spending_df = pd.concat([credit_card_spending_df, checking_acount_spending_df], axis=0, ignore_index=True, sort=False)
 
-    data = organise_data_by_category(all_spending_df)
-    monthly_groceries = extract_monthly_spending_by_category(data, GROCERIES)
-    monthly_transport = extract_monthly_spending_by_category(data, TRANSPORT)
-    monthly_restaurant = extract_monthly_spending_by_category(data, RESTAURANT)
-    monthly_coffee = extract_monthly_spending_by_category(data, COFFEE)
-    monthly_bar = extract_monthly_spending_by_category(data, BAR)
-    monthly_misc = extract_monthly_spending_by_category(data, MISC)
-    monthly_bills = extract_monthly_spending_by_category(data, BILLS)
+    credit_card_data = organise_data_by_category(credit_card_spending_df)
+    all_data = organise_data_by_category(all_spending_df)
 
-    transport_data = organise_transport_by_sub_cat(data[TRANSPORT]);
+    monthly_groceries = extract_monthly_spending_by_category(all_data, GROCERIES)
+    monthly_transport = extract_monthly_spending_by_category(all_data, TRANSPORT)
+    monthly_restaurant = extract_monthly_spending_by_category(all_data, RESTAURANT)
+    monthly_coffee = extract_monthly_spending_by_category(all_data, COFFEE)
+    monthly_bar = extract_monthly_spending_by_category(all_data, BAR)
+    monthly_misc = extract_monthly_spending_by_category(credit_card_data, MISC)  # too complicated to handle misc with the checking account statements
+    monthly_bills = extract_monthly_spending_by_category(all_data, BILLS)
+
+    transport_data = organise_transport_by_sub_cat(all_data[TRANSPORT]);
     monthly_transport_carshare = extract_monthly_spending_by_category(transport_data, TR_CARSHARE)
     monthly_transport_rental = extract_monthly_spending_by_category(transport_data, TR_RENTAL)
     monthly_transport_cab = extract_monthly_spending_by_category(transport_data, TR_CAB)
@@ -742,7 +774,7 @@ if __name__ == "__main__":
         for el in debug_pd:
             print(f"Content of {el} dataframe")
             with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-                print(data[el].sort_values(by=['date']).to_string(index=False))
+                print(all_data[el].sort_values(by=['date']).to_string(index=False))
                 print()
 
 
