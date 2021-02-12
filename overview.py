@@ -23,7 +23,7 @@ output_pdf = os.path.dirname(os.path.abspath(__file__)) + "/overview.pdf"
 
 Groceries = ["iga", "save on foods", "nesters", "t&t", "kiki", "yig", "persia foods", "whole foods",
              "organic acres market", "danial market", "choices", "safeway", "market", "urban fare",
-             "nofrills", "costco"]
+             "nofrills", "costco", "supermarket"]
 
 TransportCarShare = ["car2go", "c2g", "evo *car *share"]
 TransportRental = ["avis", "rentals", "petrocan", "husky", "[^a-z]esso", "super save", "shell"]
@@ -42,7 +42,7 @@ Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
               "freshii", "captain's boil", "korean", "salade de fruits", "a & w", "ebisu", "mcdonald's", "cuchillo",
               "joe fortes", "the templeton", "freshii", "catering", "mary's", "meat & bread", "church's chicken",
               "rosemary rocksalt", "food", "deli", "red robin", "food", "snack", "banter room", "tap house", "lunch",
-              "wings", "dairy queen", "tocador", "keg", "panago"]
+              "wings", "dairy queen", "tocador", "keg", "panago", "disco cheetah"]
 
 Coffee = ["cafe", "coffee", "tim hortons", "starbucks", "bean", "birds & the beets", "the mighty oak",
           "le marche st george", "caffe", "coco et olive", "buro", "blenz", "green horn", "bakery", "revolver",
@@ -52,11 +52,10 @@ Coffee = ["cafe", "coffee", "tim hortons", "starbucks", "bean", "birds & the bee
 Bar = ["brew", "beer", "pub[^a-z]", "steamworks", "distillery", "bar[^a-z]", "narrow lounge", "rumpus room",
        "five point", "score on davie", "tap & barrel", "the cambie", "colony", "alibi room", "local ",
        "per se social corner", "grapes & soda", "portland craft", "the new oxford", "keefer", "liquor", "wine", "tapshack",
-       "fox", "night club", "disco cheetah", "the pint", "the roxy", "commodore", "high tower management", "browns", "lounge", "mahony"]
+       "fox", "night club", "the pint", "the roxy", "commodore", "high tower management", "browns", "lounge", "mahony",
+       "fountainhead"]
 
 Bills = ["fido", "shaw", "fitness", "ymca", "bcaa", "digital ocean", "twilio", "soundcloud"]
-
-Incomes = ["payroll", "ei", "deposit"]  # deposit include e-transfer
 
 GROCERIES = 'groceries'
 TRANSPORT = 'transport'
@@ -198,22 +197,18 @@ def organise_transport_by_sub_cat(_dfTransport):
             dic_carshare[csh] = row
             csh = csh + 1
             continue
-
         if is_row_in_category(row, TransportRental):
             dic_rental[r] = row
             r = r+1
             continue
-
         if is_row_in_category(row, TransportCab):
             dic_cab[c] = row
             c = c+1
             continue
-
         if is_row_in_category(row, TransportTranslink):
             dic_translink[t] = row
             t = t+1
             continue
-
         if is_row_in_category(row, TransportMisc):
             dic_misc[m] = row
             m = m+1
@@ -263,6 +258,7 @@ def extract_monthly_spending_by_category(_df, category):
 
     if category == BILLS:
         df_rent = pd.DataFrame(columns=['date', 'amount'])
+        df_icbc = pd.DataFrame(columns=['date', 'amount'])
 
 
     # let's only do the math between the first and last spending day in the csv file to avoid
@@ -305,17 +301,23 @@ def extract_monthly_spending_by_category(_df, category):
                                                         ignore_index=True)
                 # Handle ICBC
                 if (year == 2020 and month >= 11) or year > 2020:
-                    df_rent = df_rent.append({"date": pd.to_datetime("{}-{}".format(month, year)),
+                    df_icbc = df_icbc.append({"date": pd.to_datetime("{}-{}".format(month, year)),
                                                         "amount": 96},
                                                         ignore_index=True)
 
 
-    df_temp.name = category
-    df_temp.set_index('date', inplace=True)
-
     if category == BILLS:  # Add rent to bills
         df_rent.set_index('date', inplace=True)
-        df_temp["amount"] = df_temp["amount"].add(df_rent["amount"])
+        df_icbc.set_index('date', inplace=True)
+
+        # append all fixed expenses. Some indexes might duplicate
+        df_bills = df_rent.append(df_icbc)
+        # Since some expenses may overlap, let's sum all the amounts from the ones that have the same index (month)
+        df_temp = df_bills.groupby(df_bills.index)['amount'].sum().reset_index()
+
+
+    df_temp.name = category
+    df_temp.set_index('date', inplace=True)
 
     return df_temp
 
@@ -625,7 +627,7 @@ def render_monthly_bar_stacked(_df_list, useAbsoluteAvg=False, title="Month by m
     ax.xaxis.set_major_formatter(fmt)
     ax.legend()
 
-    plt.tight_layout(w_pad=200, h_pad=500)
+    # plt.tight_layout(w_pad=200, h_pad=500)
     return fig
 
 
@@ -698,8 +700,15 @@ if __name__ == "__main__":
             if file.lower().endswith('.csv'):
                 csv_credit_card_file = credit_card_statement_folder + '/' + file
                 print(f"Read CSV file {file}...")
-                # Extract csv into dataframe
-                tmp_list_credit_card.append(pd.read_csv(filepath_or_buffer=csv_credit_card_file, sep=',', names=["date","place","amount"], keep_default_na=False))
+                # Extract csv into dataframe, handle each bank statement accordingly
+                if "scotiabank" in file:
+                    scotia_csv = pd.read_csv(filepath_or_buffer=csv_credit_card_file, sep=',', names=["date","place","amount"], keep_default_na=False)
+                    scotia_csv['date'] = pd.to_datetime(scotia_csv['date'], format='%m/%d/%Y', errors='coerce')
+                    tmp_list_credit_card.append(scotia_csv)
+                elif "bmo" in file:
+                    bmo_csv = pd.read_csv(filepath_or_buffer=csv_credit_card_file, sep=',', usecols=[2,4,5], names=["date","amount","place"], keep_default_na=False)
+                    bmo_csv['date'] = pd.to_datetime(bmo_csv['date'], format='%Y%m%d', errors='coerce')
+                    tmp_list_credit_card.append(bmo_csv)
     except FileNotFoundError:
         print('** ERROR ** File {} not found'.format(csv_credit_card_file))
         sys.exit()
@@ -736,7 +745,6 @@ if __name__ == "__main__":
 
     # Change spending into positive values, datetime format for the 'date' column
     credit_card_spending_df['amount'] = credit_card_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
-    credit_card_spending_df['date'] = pd.to_datetime(credit_card_spending_df['date'])
     checking_acount_spending_df['amount'] = checking_acount_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
     checking_acount_spending_df['date'] = pd.to_datetime(checking_acount_spending_df['date'])
     checking_acount_spending_df = checking_acount_spending_df.drop(columns=["null","type"])  # TODO: probably cleaner to do that from the get go in pd.read_csv()
