@@ -30,7 +30,8 @@ TransportRental = ["avis", "rentals", "petrocan", "husky", "[^a-z]esso", "super 
 TransportCab = ["cab[^a-rt-z]", "taxi", "uber", "lyft"]
 TransportTranslink = ["compass"]
 TransportMisc = ["poparide", "amtrack", "boltbus"]
-Transport = TransportCarShare + TransportRental + TransportCab + TransportTranslink + TransportMisc
+TransportCar = ["midas", "impark"]
+Transport = TransportCarShare + TransportRental + TransportCab + TransportTranslink + TransportMisc + TransportCar
 
 Restaurant = ["doordash", "skipthedishes", "restau", "a&w", "cuisine",
               "moxie's", "burger", "la belle patate", "pho", "pizza", "bestie",
@@ -69,6 +70,7 @@ TR_RENTAL = 'rental'
 TR_CAB = 'cab'
 TR_TRANSLINK = 'translink'
 TR_MISC = 'tr_misc'
+TR_CAR = 'car'
 
 colours = ['#5DADE2',  # blue
            '#F5B041',  # orange
@@ -187,8 +189,8 @@ def organise_data_by_category(my_dataframe):
 #
 def organise_transport_by_sub_cat(_dfTransport):
     # it is 3 times faster to create a dataframe from a full dictionary rather than appending rows after rows to an already existing dataframe
-    dic_carshare, dic_rental, dic_cab, dic_translink, dic_misc = {}, {}, {}, {}, {}
-    csh, r, c, t, m = [0]*5  # indexes
+    dic_carshare, dic_rental, dic_cab, dic_translink, dic_misc, dic_car = {}, {}, {}, {}, {}, {}
+    csh, r, c, t, m, car = [0]*6  # indexes
 
     # Let's go over each rows of the unsorted dataframe and populate the category's dictionary.
     for index, row in _dfTransport.iterrows():
@@ -216,6 +218,10 @@ def organise_transport_by_sub_cat(_dfTransport):
             dic_misc[m] = row
             m = m+1
             continue
+        if is_row_in_category(row, TransportCar):
+            dic_car[car] = row
+            car = car+1
+            continue
 
         # If none of the above then let's put it in misc spending
         dic_misc[m] = row
@@ -226,13 +232,15 @@ def organise_transport_by_sub_cat(_dfTransport):
     df_cab = pd.DataFrame.from_dict(dic_cab, orient='index', columns=['date', 'place', 'amount'])
     df_translink = pd.DataFrame.from_dict(dic_translink, orient='index', columns=['date', 'place', 'amount'])
     df_misc = pd.DataFrame.from_dict(dic_misc, orient='index', columns=['date', 'place', 'amount'])
+    df_car = pd.DataFrame.from_dict(dic_car, orient='index', columns=['date', 'place', 'amount'])
 
     allTransport_df = {
         TR_CARSHARE: df_carshare,
         TR_RENTAL: df_rental,
         TR_CAB: df_cab,
         TR_TRANSLINK: df_translink,
-        TR_MISC: df_misc
+        TR_MISC: df_misc,
+        TR_CAR: df_car
     }
 
     return allTransport_df
@@ -751,11 +759,12 @@ if __name__ == "__main__":
     monthly_transport_cab = extract_monthly_spending_by_category(transport_data, TR_CAB)
     monthly_transport_translink = extract_monthly_spending_by_category(transport_data, TR_TRANSLINK)
     monthly_transport_misc = extract_monthly_spending_by_category(transport_data, TR_MISC)
+    monthly_transport_car = extract_monthly_spending_by_category(transport_data, TR_CAR)
 
     monthly_spending = [monthly_bills, monthly_groceries, monthly_transport, monthly_restaurant,
                         monthly_coffee, monthly_bar, monthly_misc]
 
-    monthly_transport = [monthly_transport_carshare, monthly_transport_rental, monthly_transport_cab, monthly_transport_translink]  # not interested about misc
+    monthly_transport = [monthly_transport_carshare, monthly_transport_rental, monthly_transport_cab, monthly_transport_translink, monthly_transport_car]  # not interested about misc
 
     figures = []
     figures.append(render_monthly_bar_by_cat(monthly_spending[1:]))  # Do not plot bills expenses
