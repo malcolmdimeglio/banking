@@ -266,8 +266,8 @@ def extract_monthly_spending_by_category(_df, category):
     #
     # max_year = credit_card_spending_df['date'].max().year
     max_year = date.today().year
-    min_year = credit_card_spending_df['date'].min().year
-    min_month = credit_card_spending_df['date'].min().month
+    min_year = all_spending_df['date'].min().year  # TODO: this is wrong doing. shouldn't use global variable here
+    min_month = all_spending_df['date'].min().month
     # max_month = credit_card_spending_df['date'].max().month
     max_month = date.today().month
 
@@ -534,7 +534,7 @@ def render_monthly_bar_stacked(_df_list, useAbsoluteAvg=False, title="Month by m
     if empty_chart:
         bar = ax.bar(date.today(),
                     0,
-                    color=colours[i],
+                    color=colours[index],
                     label='monthly')
         ax.annotate('NO DATA',
                     xy=(date.today(), 0),
@@ -670,6 +670,57 @@ def render_average_pie(_df_list):
     return fig
 
 
+def parse_statement(csv_file):
+    if "scotiabank" in csv_file:
+        return extract_scotiabank_cc(csv_file)
+    elif "bmo" in csv_file:
+        return extract_bmo_cc(csv_file)
+    else:
+        raise("file type not handled")
+
+
+# def extract_checking(csv_file):
+#     checking = pd.read_csv(filepath_or_buffer=csv_file, sep=',', names=[ "date", "amount", "null", "type", "place" ], keep_default_na=False)
+#     return checking
+
+
+def extract_scotiabank_cc(csv_file):
+    scotia = pd.read_csv(filepath_or_buffer=csv_file, sep=',', names=["date", "place", "amount"], keep_default_na=False)
+    scotia['date'] = pd.to_datetime(scotia['date'], format='%m/%d/%Y', errors='coerce')
+    scotia = remove_cc_income(scotia)
+    if scotia.empty:
+        print(f"It seems your CSV file content is either empty or does not contain any debit on your credit history. \
+        \nPlease check the content of {os.path.basename(csv_file)}")
+        return scotia
+    scotia = spending_as_pos_value(scotia)
+
+    return scotia
+
+
+def extract_bmo_cc(csv_file):
+    bmo = pd.read_csv(filepath_or_buffer=csv_file, sep=',', usecols=[2, 4, 5], names=["date", "amount", "place"], keep_default_na=False)
+    bmo['date'] = pd.to_datetime(bmo['date'], format='%Y%m%d', errors='coerce')
+    bmo = remove_cc_income(bmo)
+    if bmo.empty:
+        print(f"It seems your CSV file content is either empty or does not contain any debit on your credit history. \
+        \nPlease check the content of {os.path.basename(csv_file)}")
+        return bmo
+    bmo = spending_as_pos_value(bmo)
+    return bmo
+
+
+def remove_cc_income(credit_card_pd):
+    print("Parsing: Remove income")
+    return credit_card_pd[credit_card_pd.amount < 0]
+
+
+def spending_as_pos_value(credit_card_pd):
+    print("Parsing: Spending as positive value")
+    credit_card_pd['amount'] = credit_card_pd['amount'].apply(lambda x: -x)
+    return credit_card_pd
+
+
+
 if __name__ == "__main__":
     # Let's handle the potential debug parameters first
     if len(sys.argv) >= 2 and sys.argv[1].lower() == "debug":
@@ -682,7 +733,7 @@ if __name__ == "__main__":
                     debug_pd.append(l_arg)
                 elif l_arg == "all":  # if all then redefine everything and exit the loop. So that we don't have doubles
                     debug_pd = [GROCERIES, TRANSPORT, RESTAURANT, COFFEE, BAR, MISC, BILLS]
-                    break;
+                    break
                 else:
                     print(f" '{arg}' Unknown parameter. Parameter accepted are: groceries, transport, restaurant, coffee, bar, misc, all")
                     print("i.e: ./overview debug bar coffee")
@@ -701,56 +752,59 @@ if __name__ == "__main__":
                 csv_credit_card_file = credit_card_statement_folder + '/' + file
                 print(f"Read CSV file {file}...")
                 # Extract csv into dataframe, handle each bank statement accordingly
-                if "scotiabank" in file:
-                    scotia_csv = pd.read_csv(filepath_or_buffer=csv_credit_card_file, sep=',', names=["date","place","amount"], keep_default_na=False)
-                    scotia_csv['date'] = pd.to_datetime(scotia_csv['date'], format='%m/%d/%Y', errors='coerce')
-                    tmp_list_credit_card.append(scotia_csv)
-                elif "bmo" in file:
-                    bmo_csv = pd.read_csv(filepath_or_buffer=csv_credit_card_file, sep=',', usecols=[2,4,5], names=["date","amount","place"], keep_default_na=False)
-                    bmo_csv['date'] = pd.to_datetime(bmo_csv['date'], format='%Y%m%d', errors='coerce')
-                    tmp_list_credit_card.append(bmo_csv)
+                # if "scotiabank" in file:
+                    # scotia_csv = pd.read_csv(filepath_or_buffer=csv_credit_card_file, sep=',', names=["date","place","amount"], keep_default_na=False)
+                    # scotia_csv['date'] = pd.to_datetime(scotia_csv['date'], format='%m/%d/%Y', errors='coerce')
+                    # tmp_list_credit_card.append(scotia_csv)
+                # elif "bmo" in file:
+                    # bmo_csv = pd.read_csv(filepath_or_buffer=csv_credit_card_file, sep=',', usecols=[2,4,5], names=["date","amount","place"], keep_default_na=False)
+                    # bmo_csv['date'] = pd.to_datetime(bmo_csv['date'], format='%Y%m%d', errors='coerce')
+                    # tmp_list_credit_card.append(bmo_csv)
+                tmp_list_credit_card.append(parse_statement(csv_credit_card_file))
     except FileNotFoundError:
         print('** ERROR ** File {} not found'.format(csv_credit_card_file))
         sys.exit()
 
-    try:
-        tmp_list_checking_account = []
-        for file in os.listdir(checking_account_statement_folder):
-            if file.lower().endswith('.csv'):
-                csv_checking_account_file = checking_account_statement_folder + '/' + file
-                print(f"Read CSV file {file}...")
-                # Extract csv into dataframe
-                tmp_list_checking_account.append(pd.read_csv(filepath_or_buffer=csv_checking_account_file, sep=',', names=["date","amount","null","type","place"], keep_default_na=False))
-    except FileNotFoundError:
-        print('** ERROR ** File {} not found'.format(csv_checking_account_file))
-        sys.exit()
+    # try:
+    #     tmp_list_checking_account = []
+    #     for file in os.listdir(checking_account_statement_folder):
+    #         if file.lower().endswith('.csv'):
+    #             csv_checking_account_file = checking_account_statement_folder + '/' + file
+    #             print(f"Read CSV file {file}...")
+    #             # Extract csv into dataframe
+    #             # tmp_list_checking_account.append(pd.read_csv(filepath_or_buffer=csv_checking_account_file, sep=',', names=["date","amount","null","type","place"], keep_default_na=False))
+    # except FileNotFoundError:
+    #     print('** ERROR ** File {} not found'.format(csv_checking_account_file))
+    #     sys.exit()
 
 
     # Start computing
-    credit_card_spending_df = pd.concat(tmp_list_credit_card, axis=0, ignore_index=True, sort=False)
-    checking_acount_spending_df = pd.concat(tmp_list_checking_account, axis=0, ignore_index=True, sort=False)
+    # credit_card_spending_df = pd.concat(tmp_list_credit_card, axis=0, ignore_index=True, sort=False)
+    # checking_acount_spending_df = pd.concat(tmp_list_checking_account, axis=0, ignore_index=True, sort=False)
 
 
-    print("Remove incomes, standardize text and date")
+    # print("Remove incomes, standardize text and date")
     # Remove all incomes
-    credit_card_spending_df = credit_card_spending_df[credit_card_spending_df.amount < 0]
-    if credit_card_spending_df.empty:
-        print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
-        \nPlease check the content of {}".format(os.path.basename(csv_credit_card_file)))
+    # credit_card_spending_df = credit_card_spending_df[credit_card_spending_df.amount < 0]
+    # if credit_card_spending_df.empty:
+    #     print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
+    #     \nPlease check the content of {}".format(os.path.basename(csv_credit_card_file)))
 
-    checking_acount_spending_df = checking_acount_spending_df[checking_acount_spending_df.amount < 0]
-    if checking_acount_spending_df.empty:
-        print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
-        \nPlease check the content of {}".format(os.path.basename(csv_checking_account_file)))
+    # checking_acount_spending_df = checking_acount_spending_df[checking_acount_spending_df.amount < 0]
+    # if checking_acount_spending_df.empty:
+    #     print("It seems your CSV file content is either empty or does not contain any debit on your credit history. \
+    #     \nPlease check the content of {}".format(os.path.basename(csv_checking_account_file)))
 
     # Change spending into positive values, datetime format for the 'date' column
-    credit_card_spending_df['amount'] = credit_card_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
-    checking_acount_spending_df['amount'] = checking_acount_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
-    checking_acount_spending_df['date'] = pd.to_datetime(checking_acount_spending_df['date'])
-    checking_acount_spending_df = checking_acount_spending_df.drop(columns=["null","type"])  # TODO: probably cleaner to do that from the get go in pd.read_csv()
-    all_spending_df = pd.concat([credit_card_spending_df, checking_acount_spending_df], axis=0, ignore_index=True, sort=False)
+    # credit_card_spending_df['amount'] = credit_card_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
+    # checking_acount_spending_df['amount'] = checking_acount_spending_df['amount'].apply(lambda x: -x)  # TODO: Maybe more efficient not to and just do that at the very end when ploting the graph?
+    # checking_acount_spending_df['date'] = pd.to_datetime(checking_acount_spending_df['date'])
+    # checking_acount_spending_df = checking_acount_spending_df.drop(columns=["null","type"])  # TODO: probably cleaner to do that from the get go in pd.read_csv()
+    # all_spending_df = pd.concat([credit_card_spending_df, checking_acount_spending_df], axis=0, ignore_index=True, sort=False)
+    all_spending_df = pd.concat(tmp_list_credit_card, axis=0, ignore_index=True, sort=False)
 
-    credit_card_data = organise_data_by_category(credit_card_spending_df)
+
+    # credit_card_data = organise_data_by_category(credit_card_spending_df)
     all_data = organise_data_by_category(all_spending_df)
 
     monthly_groceries = extract_monthly_spending_by_category(all_data, GROCERIES)
@@ -758,10 +812,10 @@ if __name__ == "__main__":
     monthly_restaurant = extract_monthly_spending_by_category(all_data, RESTAURANT)
     monthly_coffee = extract_monthly_spending_by_category(all_data, COFFEE)
     monthly_bar = extract_monthly_spending_by_category(all_data, BAR)
-    monthly_misc = extract_monthly_spending_by_category(credit_card_data, MISC)  # too complicated to handle misc with the checking account statements
+    monthly_misc = extract_monthly_spending_by_category(all_data, MISC)  # too complicated to handle misc with the checking account statements
     monthly_bills = extract_monthly_spending_by_category(all_data, BILLS)
 
-    transport_data = organise_transport_by_sub_cat(all_data[TRANSPORT]);
+    transport_data = organise_transport_by_sub_cat(all_data[TRANSPORT])
     monthly_transport_carshare = extract_monthly_spending_by_category(transport_data, TR_CARSHARE)
     monthly_transport_rental = extract_monthly_spending_by_category(transport_data, TR_RENTAL)
     monthly_transport_cab = extract_monthly_spending_by_category(transport_data, TR_CAB)
