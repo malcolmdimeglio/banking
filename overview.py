@@ -71,6 +71,9 @@ TR_TRANSLINK = 'translink'
 TR_MISC = 'tr_misc'
 TR_CAR = 'car'
 
+SCOTIABANK = "scotiabank"
+BMO = "bmo"
+
 colours = ['#5DADE2',  # blue
            '#F5B041',  # orange
            '#58D68D',  # green
@@ -80,42 +83,33 @@ colours = ['#5DADE2',  # blue
            '#F7DC6F']  # yellow
 
 
-# @brief      Determines if row['place'] is in the given category.
-#
-# @param      my_row   Single row [date,place,amount] of a dataframe
-# @param      my_list  Category list
-#
-# @return     True if row in category, False otherwise.
-#
-def is_row_in_category(my_row, my_list):
-    for el in my_list:
-        if re.search(el, my_row['place'], re.IGNORECASE):
+def is_row_in_category(row, category):
+    """Determines if row['place'] is in the given category
+
+    Args:
+        row (pandas.core.series.Series): Single row [date,place,amount] of a dataframe
+        category (list): Category list
+
+    Returns:
+        bool: True if row in category, False otherwise
+    """
+
+    for place in category:
+        if re.search(place, row['place'], re.IGNORECASE):
             return True
     return False
 
 
-# @brief      Populate a given dataframe with a given row
-#
-# @param      _df   Dataframe to populate
-# @param      row   Row to be added to the provided dataframe
-#
-# @return     The updated dataframe
-#
-def populate(_df, row):
-    _df = _df.append({'date': row['date'],
-                      'place': row['place'],
-                      'amount': row['amount']},
-                     ignore_index=True)
-    return _df
-
-
-# @brief      Parse all spending and populate smaller dataframes by categories
-#
-# @param      my_dataframe  Unparsed dataframe with all uncategorized expenses
-#
-# @return     A dictionary of dataframe. [key] = category name; [value] = dataframe with the all categorie's related expenses
-#
 def organise_data_by_category(my_dataframe):
+    """Parse all spending and populate smaller dataframes by categories
+
+    Args:
+        my_dataframe (pandas.core.frame.DataFrame): my_dataframe  Unparsed dataframe with all uncategorized expenses
+
+    Returns:
+        dict: A dictionary of dataframe. [key] = category name; [value] = dataframe with the all categorie's related expenses
+    """
+
     print("Organise spendings into categories")
 
     # it is 3 times faster to create a dataframe from a full dictionary rather than appending rows after rows to an already existing dataframe
@@ -179,13 +173,16 @@ def organise_data_by_category(my_dataframe):
     return all_df
 
 
-# @brief      Parse all spending in transport and populate smaller dataframes by categories
-#
-# @param      _dfTransport  Unparsed dataframe with all transport expenses
-#
-# @return     A dictionary of dataframe. [key] = category name; [value] = dataframe with the all categorie's related expenses
-#
 def organise_transport_by_sub_cat(_dfTransport):
+    """Parse all spending in transport and populate smaller dataframes by categories
+
+    Args:
+        _dfTransport (pandas.core.frame.DataFrame): Unparsed dataframe with all transport expenses
+
+    Returns:
+        [dict: A dictionary of dataframe. [key] = category name; [value] = dataframe with the all categorie's related expenses
+    """
+
     # it is 3 times faster to create a dataframe from a full dictionary rather than appending rows after rows to an already existing dataframe
     dic_carshare, dic_rental, dic_cab, dic_translink, dic_misc, dic_car = {}, {}, {}, {}, {}, {}
     csh, r, c, t, m, car = [0] * 6  # indexes
@@ -240,22 +237,25 @@ def organise_transport_by_sub_cat(_dfTransport):
     return allTransport_df
 
 
-# @brief      Sumarize for each month the total spending for a given category
-#
-# @param      _df       An organized by category dataframe
-# @param      category  The category name you want to extract the information of
-#
-# @return     A dataframe with only 1 category's information and the sum of all the spendings for that category, listed by month
-#
-def extract_monthly_spending_by_category(_df, category):
-    print("Extract monthly spendings for {}".format(category))
+def extract_monthly_spending_by_category(_df, categoryName):
+    """Sumarize for each month the total spending for a given category
+
+    Args:
+        _df (dict): An organized by category dataframe
+        categoryName (str): The category name you want to extract the information of
+
+    Returns:
+        [type]: A dataframe with only 1 category's information and the sum of all the spendings for that category, listed by month
+    """
+
+    print("Extract monthly spendings for {}".format(categoryName))
     df_temp = pd.DataFrame(columns=['date', 'amount'])
 
-    if _df[category].empty:
-        df_temp.name = category
+    if _df[categoryName].empty:
+        df_temp.name = categoryName
         return df_temp
 
-    if category == BILLS:
+    if categoryName == BILLS:
         df_rent = pd.DataFrame(columns=['date', 'amount'])
         df_icbc = pd.DataFrame(columns=['date', 'amount'])
 
@@ -279,11 +279,11 @@ def extract_monthly_spending_by_category(_df, category):
         # sum all spending from a whole month, each month of the year
         for month in range(start_month, end_month + 1):
             df_temp = df_temp.append({"date": pd.to_datetime("{}-{}".format(month, year)),
-                                     "amount": _df[category].loc[(_df[category].date.dt.month == month) &
-                                                                 (_df[category].date.dt.year == year), 'amount'].sum()},
+                                     "amount": _df[categoryName].loc[(_df[categoryName].date.dt.month == month) &
+                                                                     (_df[categoryName].date.dt.year == year), 'amount'].sum()},
                                      ignore_index=True)
 
-            if category == BILLS:
+            if categoryName == BILLS:
                 # Handle rent
                 if year == 2018 and month < 12:
                     df_rent = df_rent.append({"date": pd.to_datetime("{}-{}".format(month, year)), "amount": 1000},
@@ -299,7 +299,7 @@ def extract_monthly_spending_by_category(_df, category):
                     df_icbc = df_icbc.append({"date": pd.to_datetime("{}-{}".format(month, year)), "amount": 96},
                                              ignore_index=True)
 
-    if category == BILLS:  # Add rent to bills
+    if categoryName == BILLS:  # Add rent to bills
         df_rent.set_index('date', inplace=True)
         df_icbc.set_index('date', inplace=True)
 
@@ -308,19 +308,21 @@ def extract_monthly_spending_by_category(_df, category):
         # Since some expenses may overlap, let's sum all the amounts from the ones that have the same index (month)
         df_temp = df_bills.groupby(df_bills.index)['amount'].sum().reset_index()
 
-    df_temp.name = category
+    df_temp.name = categoryName
     df_temp.set_index('date', inplace=True)
 
     return df_temp
 
 
-# @brief      Attach a text label above each ploted bar.
-#
-# @param      rects   The rectangles (each ploted bar)
-# @param      ax      Axis
-# @param      height  The height (monthy $ value)
-#
 def autolabel(rects, ax, height):
+    """Attach a text label above each ploted bar
+
+    Args:
+        rects (matplotlib.container.BarContainer): The rectangles (each ploted bar)
+        ax (matplotlib.axes._subplots.AxesSubplot): Axis
+        height (pandas.core.series.Series): The height (monthy $ value)
+    """
+
     for index, rect in enumerate(rects):
         ax.annotate('{}'.format(int(height[index])),
                     xy=(rect.get_x() + rect.get_width() / 2, height[index]),
@@ -330,16 +332,19 @@ def autolabel(rects, ax, height):
                     va='bottom')
 
 
-# @brief      Calculates the average.
-#
-# @param      _df            The dataframe to extract the spending mean value of
-# @param      forMonths      The period months from today's date to calculate the average of
-# @param      absolute       Boolean. If False the average computation will no consider the min value and max value for calculation.
-# @param      endDay         Datetime type. Calculate average until this day and for the past {forMonths}
-#
-# @return     The average spending over the last 'forMonths'.
-#
 def compute_average(_df, forMonths=0, endDay=pd.datetime.now().date(), absolute=False):
+    """Calculates the average value in the 'amount' column of a given dataframe
+
+    Args:
+        _df (pandas.core.frame.DataFrame): The dataframe to extract the spending mean value of
+        forMonths (int, optional): The period months from today's date to calculate the average of. Defaults to 0.
+        endDay (pandas._libs.tslibs.timestamps.Timestamp, optional): Boolean. If False the average computation will no consider the min value and max value for calculation. Defaults to pd.datetime.now().date().
+        absolute (bool, optional): Datetime type. Calculate average until this day and for the past {forMonths}. Defaults to False.
+
+    Returns:
+        int: The average spending over the last 'forMonths'
+    """
+
     # Allows to compute the average over the last forMonths time
     if forMonths > 0:
         fromDay = endDay - pd.DateOffset(months=int(forMonths))
@@ -368,14 +373,17 @@ def compute_average(_df, forMonths=0, endDay=pd.datetime.now().date(), absolute=
     return _mean
 
 
-# @brief      Will plot a bar chart for each category. X axis will be scaled by month.
-#
-# @param      _df_list          List that contains each categorie's dataframe spending per month
-# @param      useAbsoluteAvg    Boolean. If False the average computation will no consider the min value and max value for calculation.
-#
-# @return     The figure with all the charts
-#
 def render_monthly_bar_by_cat(_df_list, useAbsoluteAvg=False):
+    """Will plot a bar chart for each category. X axis will be scaled by month
+
+    Args:
+        _df_list (list): List that contains each categorie's dataframe spending per month
+        useAbsoluteAvg (bool, optional): If False the average computation will no consider the min value and max value for calculation. Defaults to False.
+
+    Returns:
+        matplotlib.figure.Figure: The figure with all the charts
+    """
+
     # 3 columns display
     col = 3
     row = len(_df_list) / 3
@@ -489,19 +497,22 @@ def render_monthly_bar_by_cat(_df_list, useAbsoluteAvg=False):
         ax[j].set_axis_off()
 
     plt.tight_layout(w_pad=2.3, h_pad=1.3)
+
     return fig
 
 
-# @brief      Will plot a stacked bar chart. Displaying the total amount of spending per month, stacking all categories together
-#             Additionally will display average spending overall and over 6 months periods
-#
-# @param      _df_list          List that contains each categorie's dataframe spending per month
-# @param      useAbsoluteAvg    Boolean. If False the average computation will no consider the min value and max value for calculation.
-# @param      title             String. Optional. Give your graph a tittle
-#
-# @return     The figure with the calculated chart
-#
 def render_monthly_bar_stacked(_df_list, useAbsoluteAvg=False, title="Month by month spending"):
+    """[summary]
+
+    Args:
+        _df_list (list): List that contains each categorie's dataframe spending per month
+        useAbsoluteAvg (bool, optional): If False the average computation will no consider the min value and max value for calculation. Defaults to False.
+        title (str, optional): Give your graph a tittle. Defaults to "Month by month spending".
+
+    Returns:
+        matplotlib.figure.Figure: The figure with the calculated chart
+    """
+
     print("Render monthy spending on stack graph for all categories")
     fig, ax = plt.subplots(1, 1, figsize=(30, 15))
 
@@ -618,14 +629,16 @@ def render_monthly_bar_stacked(_df_list, useAbsoluteAvg=False, title="Month by m
     return fig
 
 
-#
-# @brief      Will plot a pie chart representing the proportion of spending by category
-#
-# @param      _df   A dataframe contaning the average overall spending by category
-#
-# @return     The figure with the calculated chart
-#
 def render_average_pie(_df_list):
+    """Will plot a pie chart representing the proportion of spending by category
+
+    Args:
+        _df_list (list): A list of dataframe contaning the average overall spending by category
+
+    Returns:
+        matplotlib.figure.Figure: The figure with the calculated chart
+    """
+
     print("Render average spending by category on pie chart")
 
     avg_df = pd.DataFrame(columns=['name', 'amount'])
@@ -658,9 +671,18 @@ def render_average_pie(_df_list):
 
 
 def parse_statement(csv_file):
-    if "scotiabank" in csv_file:
+    """Parse the given statement and apply needed modification
+
+    Args:
+        csv_file (str): Path to csv file to parse
+
+    Returns:
+        pandas.core.frame.DataFrame: A parsed and organized dataframe for the given statement
+    """
+
+    if SCOTIABANK in csv_file:
         return extract_scotiabank_cc(csv_file)
-    elif "bmo" in csv_file:
+    elif BMO in csv_file:
         return extract_bmo_cc(csv_file)
     else:
         raise("file type not handled")
@@ -672,38 +694,87 @@ def parse_statement(csv_file):
 
 
 def extract_scotiabank_cc(csv_file):
-    scotia = pd.read_csv(filepath_or_buffer=csv_file, sep=',', names=["date", "place", "amount"], keep_default_na=False)
-    scotia['date'] = pd.to_datetime(scotia['date'], format='%m/%d/%Y', errors='coerce')
-    scotia = remove_cc_income(scotia)
-    if scotia.empty:
+    """Parse the given Scotiabank statement and apply needed modification
+
+    Args:
+        csv_file (str): Path to csv file to parse
+
+    Returns:
+        pandas.core.frame.DataFrame: A parsed and organized dataframe for the given statement
+    """
+
+    scotia_df = pd.read_csv(filepath_or_buffer=csv_file, sep=',', names=["date", "place", "amount"], keep_default_na=False)
+    scotia_df['date'] = pd.to_datetime(scotia_df['date'], format='%m/%d/%Y', errors='coerce')
+    scotia_df = remove_cc_income(scotia_df, SCOTIABANK)
+    if scotia_df.empty:
         print(f"It seems your CSV file content is either empty or does not contain any debit on your credit history. \
         \nPlease check the content of {os.path.basename(csv_file)}")
-        return scotia
-    scotia = spending_as_pos_value(scotia)
+        return scotia_df
+    scotia_df = spending_as_pos_value(scotia_df, SCOTIABANK)
 
-    return scotia
+    return scotia_df
 
 
 def extract_bmo_cc(csv_file):
-    bmo = pd.read_csv(filepath_or_buffer=csv_file, sep=',', usecols=[2, 4, 5], names=["date", "amount", "place"], keep_default_na=False)
-    bmo['date'] = pd.to_datetime(bmo['date'], format='%Y%m%d', errors='coerce')
-    bmo = remove_cc_income(bmo)
-    if bmo.empty:
+    """Parse the given BMO statement and apply needed modification
+
+    Args:
+        csv_file (str): Path to csv file to parse
+
+    Returns:
+        pandas.core.frame.DataFrame: A parsed and organized dataframe for the given statement
+    """
+
+    bmo_df = pd.read_csv(filepath_or_buffer=csv_file, sep=',', usecols=[2, 4, 5], names=["date", "amount", "place"], keep_default_na=False)
+    bmo_df['date'] = pd.to_datetime(bmo_df['date'], format='%Y%m%d', errors='coerce')
+    bmo_df = remove_cc_income(bmo_df, BMO)
+    if bmo_df.empty:
         print(f"It seems your CSV file content is either empty or does not contain any debit on your credit history. \
         \nPlease check the content of {os.path.basename(csv_file)}")
-        return bmo
-    bmo = spending_as_pos_value(bmo)
-    return bmo
+        return bmo_df
+    bmo_df = spending_as_pos_value(bmo_df, BMO)
+    return bmo_df
 
 
-def remove_cc_income(credit_card_pd):
+def remove_cc_income(credit_card_pd, bank_name):
+    """Remove the income entries from the credit card statement dataframe
+
+    Args:
+        credit_card_pd (pandas.core.frame.DataFrame): The dataframe to modify
+
+    Returns:
+        pandas.core.frame.DataFrame: A dataframe with all the income removed
+    """
+
     print("Parsing: Remove income")
-    return credit_card_pd[credit_card_pd.amount < 0]
+    if bank_name == SCOTIABANK:
+        credit_card_pd = credit_card_pd[credit_card_pd.amount < 0]
+
+    elif bank_name == BMO:
+        credit_card_pd = credit_card_pd[credit_card_pd.amount > 0]
+
+    return credit_card_pd
 
 
-def spending_as_pos_value(credit_card_pd):
+def spending_as_pos_value(credit_card_pd, bank_name):
+    """Make sure that the spending are listed as positive values
+
+    Args:
+        credit_card_pd (pandas.core.frame.DataFrame): The dataframe to modify
+
+    Returns:
+        pandas.core.frame.DataFrame: A dataframe with all the spending entries listed as positive value
+    """
+
     print("Parsing: Spending as positive value")
-    credit_card_pd['amount'] = credit_card_pd['amount'].apply(lambda x: -x)
+    
+    if bank_name == SCOTIABANK:
+        credit_card_pd['amount'] = credit_card_pd['amount'].apply(lambda x: -x)
+    elif bank_name == BMO:
+        # BMO spendings are already in positive
+        pass
+    else:
+        credit_card_pd['amount'] = credit_card_pd['amount'].apply(lambda x: -x)
     return credit_card_pd
 
 
