@@ -1,0 +1,2 @@
+SCOTIABANK = "scotiabank"
+BMO = "bmo"
